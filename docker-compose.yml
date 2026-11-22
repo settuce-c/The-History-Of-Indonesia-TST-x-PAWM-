@@ -1,0 +1,55 @@
+# TheHistoryOfIndonesia - Learning Path Service
+# Jalankan di STB (arm64):   docker compose up -d --build
+# Uji lokal tanpa tunnel:    docker compose up --build core-service gateway
+#                            lalu buka http://localhost:8080/api/health
+
+services:
+  core-service:
+    build: ./core-service
+    image: thehistoryofid/core-service:1.0.0
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DB_PATH: /data/app.db
+    volumes:
+      - db-data:/data # file SQLite tetap ada walau container dibuat ulang
+    expose:
+      - "3000" # hanya terlihat di jaringan internal Docker, tidak dibuka ke host
+    mem_limit: 256m
+    cpus: 0.5
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }
+
+  gateway:
+    image: nginx:1.27-alpine # multi-arch (termasuk arm64)
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      core-service:
+        condition: service_healthy
+    # Hanya terikat ke localhost STB (untuk debug via SSH), TIDAK terbuka ke internet.
+    # Akses publik hanya lewat Cloudflare Tunnel.
+    ports:
+      - "127.0.0.1:8080:80"
+    mem_limit: 64m
+    cpus: 0.25
+    restart: unless-stopped
+    logging: *logging
+
+  tunnel:
+    image: cloudflare/cloudflared:2024.12.2 # multi-arch (termasuk arm64)
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - gateway
+    mem_limit: 64m
+    cpus: 0.25
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  db-data:
