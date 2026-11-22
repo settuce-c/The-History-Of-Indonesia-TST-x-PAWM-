@@ -1,19 +1,50 @@
 import { useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Api, errorMessage } from '../../lib/api';
 import { useFetch } from '../../lib/useFetch';
-import { Button, Card, ErrorView, Loading } from '../../components/ui';
-import { colors, radius, space } from '../../lib/theme';
+import { Button, ErrorView, IconButton, Loading, ProgressBar } from '../../components/ui';
+import { colors, font, radius, space } from '../../lib/theme';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+const TONE = {
+  idle: { border: colors.border, bg: colors.card, keyBg: colors.sand, keyFg: colors.text },
+  selected: { border: colors.navy, bg: colors.navySoft, keyBg: colors.navy, keyFg: '#FFFFFF' },
+  correct: { border: colors.success, bg: colors.successSoft, keyBg: colors.success, keyFg: '#FFFFFF' },
+  wrong: { border: colors.danger, bg: colors.dangerSoft, keyBg: colors.danger, keyFg: '#FFFFFF' },
+};
+
+function Option({ letter, label, tone, onPress, disabled }) {
+  const t = TONE[tone];
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: tone === 'selected' }}
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [styles.option, { borderColor: t.border, backgroundColor: t.bg }, pressed && { opacity: 0.85 }]}
+    >
+      <View style={[styles.key, { backgroundColor: t.keyBg }]}>
+        <Text style={[styles.keyText, { color: t.keyFg }]}>{letter}</Text>
+      </View>
+      <Text style={styles.optionText}>{label}</Text>
+      {tone === 'correct' && <Ionicons name="checkmark-circle" size={22} color={colors.success} />}
+      {tone === 'wrong' && <Ionicons name="close-circle" size={22} color={colors.danger} />}
+    </Pressable>
+  );
+}
 
 export default function QuizScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef(null);
   const { data: quiz, error, loading, reload } = useFetch(() => Api.quiz(id), [id]);
+  const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: selectedIndex }
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -21,8 +52,10 @@ export default function QuizScreen() {
   if (loading) return <Loading />;
   if (error && !quiz) return <ErrorView error={error} onRetry={reload} />;
 
-  const answeredCount = Object.keys(answers).length;
-  const allAnswered = answeredCount === quiz.totalQuestions;
+  const total = quiz.questions.length;
+  const q = quiz.questions[step];
+  const picked = q ? answers[q.id] : undefined;
+  const isLast = step === total - 1;
 
   async function submit() {
     setSubmitting(true);
@@ -34,7 +67,7 @@ export default function QuizScreen() {
       // Penilaian dilakukan di server; kunci jawaban baru diterima di respons ini.
       const res = await Api.submitQuiz(id, payload);
       setResult(res);
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
     } catch (e) {
       Alert.alert('Gagal mengirim', errorMessage(e));
     } finally {
@@ -42,125 +75,209 @@ export default function QuizScreen() {
     }
   }
 
+  function next() {
+    if (isLast) return submit();
+    setStep((s) => s + 1);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }
+
   function retry() {
     setAnswers({});
     setResult(null);
-    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    setStep(0);
   }
 
-  return (
-    <>
-      <Stack.Screen options={{ title: `Kuis: ${quiz.chapterTitle}` }} />
-      <ScrollView ref={scrollRef} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: space.lg, paddingBottom: 48 }}>
-        {result ? (
-          <ResultHeader result={result} onRetry={retry} onBack={() => router.back()} />
-        ) : (
-          <Text style={styles.intro}>
-            Jawab {quiz.totalQuestions} soal. Nilai minimal lulus {quiz.passingScore}. Kamu boleh mencoba berkali-kali.
-          </Text>
-        )}
+  function close() {
+    if (result || Object.keys(answers).length === 0) return router.back();
+    Alert.alert('Keluar dari kuis?', 'Jawabanmu belum dikirim dan akan hilang.', [
+      { text: 'Lanjut mengerjakan', style: 'cancel' },
+      { text: 'Keluar', style: 'destructive', onPress: () => router.back() },
+    ]);
+  }
 
-        {quiz.questions.map((q, qi) => {
-          const review = result?.results.find((r) => r.questionId === q.id);
-          return (
-            <Card key={q.id}>
-              <Text style={styles.qNo}>Soal {qi + 1}</Text>
-              <Text style={styles.question}>{q.question}</Text>
-              {q.options.map((opt, oi) => {
-                const selected = answers[q.id] === oi;
-                let tone = selected ? 'selected' : 'idle';
-                if (review) {
-                  if (oi === review.correctIndex) tone = 'correct';
-                  else if (selected) tone = 'wrong';
-                  else tone = 'idle';
-                }
-                return (
-                  <Pressable
-                    key={oi}
-                    disabled={Boolean(result)}
-                    onPress={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
-                    style={[styles.option, optionTone[tone]]}
-                  >
-                    <View style={[styles.letter, tone !== 'idle' && { backgroundColor: optionTone[tone].borderColor }]}>
-                      <Text style={[styles.letterText, tone !== 'idle' && { color: '#fff' }]}>{LETTERS[oi]}</Text>
-                    </View>
-                    <Text style={styles.optionText}>{opt}</Text>
-                    {tone === 'correct' && <Ionicons name="checkmark-circle" size={20} color={colors.success} />}
-                    {tone === 'wrong' && <Ionicons name="close-circle" size={20} color={colors.danger} />}
-                  </Pressable>
-                );
-              })}
-              {review && (
-                <View style={styles.explain}>
-                  <Text style={styles.explainTitle}>{review.correct ? '✅ Benar' : review.selectedIndex == null ? '⚠️ Tidak dijawab' : '❌ Salah'}</Text>
-                  <Text style={styles.explainText}>{review.explanation}</Text>
+  // ---------- Hasil ----------
+  if (result) {
+    const passed = result.passed;
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <StatusBar style="dark" />
+        <ScrollView ref={scrollRef} contentContainerStyle={{ padding: space.xl, paddingTop: insets.top + 12, paddingBottom: 130 + insets.bottom, gap: 14 }}>
+          <View style={styles.topRow}>
+            <IconButton icon="close" label="Tutup" onPress={() => router.back()} />
+            <Text style={styles.topTitle} numberOfLines={1}>
+              Hasil kuis · {quiz.chapterTitle}
+            </Text>
+            <View style={{ width: 44 }} />
+          </View>
+
+          <View style={[styles.resultCard, { backgroundColor: passed ? colors.successSoft : colors.dangerSoft }]}>
+            <View style={[styles.resultIcon, { backgroundColor: passed ? colors.success : colors.danger }]}>
+              <Ionicons name={passed ? 'ribbon' : 'refresh'} size={28} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.score, { color: passed ? colors.successInk : colors.dangerInk }]}>{result.score}</Text>
+            <Text style={styles.resultTitle}>{passed ? 'Selamat, kamu lulus!' : 'Belum lulus, coba lagi ya'}</Text>
+            <Text style={styles.resultSub}>
+              {result.correctCount}/{result.totalQuestions} benar · nilai terbaik {result.bestScore} · percobaan ke-{result.attempt}
+            </Text>
+          </View>
+
+          {result.chapterCompleted && <Banner icon="book" tone="success" text="Bab ini selesai!" />}
+          {passed && !result.chapterCompleted && <Banner icon="eye-outline" tone="gold" text="Tandai videonya sudah ditonton untuk menyelesaikan bab." />}
+          {result.eraUnlocked && <Banner icon="lock-open" tone="navy" text={`Era baru terbuka: ${result.eraUnlocked.title}`} />}
+          {result.badgeEarned && (
+            <Banner icon="medal" tone="gold" text={`${result.badgeEarned.name} (rata-rata ${result.badgeEarned.averageScore})`} />
+          )}
+
+          <Text style={styles.h2}>Pembahasan</Text>
+          {quiz.questions.map((qq, qi) => {
+            const review = result.results.find((r) => r.questionId === qq.id);
+            return (
+              <View key={qq.id} style={styles.reviewCard}>
+                <Text style={styles.qMeta}>Soal {qi + 1}</Text>
+                <Text style={styles.reviewQ}>{qq.question}</Text>
+                <View style={{ gap: 8 }}>
+                  {qq.options.map((opt, oi) => {
+                    let tone = 'idle';
+                    if (oi === review?.correctIndex) tone = 'correct';
+                    else if (answers[qq.id] === oi) tone = 'wrong';
+                    return <Option key={oi} letter={LETTERS[oi]} label={opt} tone={tone} disabled />;
+                  })}
                 </View>
-              )}
-            </Card>
-          );
-        })}
+                {review?.explanation ? (
+                  <View style={styles.explain}>
+                    <Text style={[styles.explainTitle, { color: review.correct ? colors.successInk : colors.dangerInk }]}>
+                      {review.correct ? 'Benar' : review.selectedIndex == null ? 'Tidak dijawab' : 'Belum tepat'}
+                    </Text>
+                    <Text style={styles.explainText}>{review.explanation}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </ScrollView>
 
-        {!result && (
-          <Button
-            title={allAnswered ? 'Kirim Jawaban' : `Jawab semua soal (${answeredCount}/${quiz.totalQuestions})`}
-            icon="send"
-            onPress={submit}
-            disabled={!allAnswered}
-            loading={submitting}
-          />
-        )}
-        {result && <Button title="Coba lagi" icon="refresh" variant="outline" onPress={retry} />}
-      </ScrollView>
-    </>
-  );
-}
-
-function ResultHeader({ result, onRetry, onBack }) {
-  const passed = result.passed;
-  return (
-    <Card style={{ backgroundColor: passed ? colors.successSoft : colors.dangerSoft, borderColor: passed ? colors.success : colors.danger, alignItems: 'center' }}>
-      <Ionicons name={passed ? 'ribbon' : 'refresh-circle'} size={48} color={passed ? colors.success : colors.danger} />
-      <Text style={[styles.score, { color: passed ? colors.success : colors.danger }]}>{result.score}</Text>
-      <Text style={styles.resultTitle}>{passed ? 'Selamat, kamu lulus!' : 'Belum lulus, coba lagi ya'}</Text>
-      <Text style={styles.resultSub}>
-        {result.correctCount}/{result.totalQuestions} benar · nilai terbaik {result.bestScore} · percobaan ke-{result.attempt}
-      </Text>
-      {result.chapterCompleted && <Text style={styles.banner}>📘 Bab ini selesai!</Text>}
-      {passed && !result.chapterCompleted && <Text style={styles.banner}>Tandai videonya sudah ditonton untuk menyelesaikan bab.</Text>}
-      {result.eraUnlocked && <Text style={styles.banner}>🎉 Era baru terbuka: {result.eraUnlocked.title}</Text>}
-      {result.badgeEarned && (
-        <Text style={styles.banner}>
-          🏅 {result.badgeEarned.name} (rata-rata {result.badgeEarned.averageScore})
-        </Text>
-      )}
-      <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
-        <Button title="Kembali ke bab" variant="outline" onPress={onBack} />
-        {!passed && <Button title="Ulangi" onPress={onRetry} />}
+        <View style={[styles.panel, { paddingBottom: insets.bottom + 16, flexDirection: 'row', gap: 10 }]}>
+          <Button title="Kembali ke bab" variant="outline" onPress={() => router.back()} style={{ flex: 1 }} />
+          {!passed && <Button title="Ulangi" icon="refresh" onPress={retry} style={{ flex: 1 }} />}
+        </View>
       </View>
-    </Card>
+    );
+  }
+
+  // ---------- Mengerjakan ----------
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar style="dark" />
+      <ScrollView ref={scrollRef} contentContainerStyle={{ padding: space.xl, paddingTop: insets.top + 12, paddingBottom: 160 + insets.bottom, gap: 22 }}>
+        <View style={styles.topRow}>
+          <IconButton icon="close" label="Keluar dari kuis" onPress={close} />
+          <ProgressBar value={step + (picked !== undefined ? 1 : 0)} total={total} height={10} color={colors.success} track={colors.border} style={{ flex: 1 }} />
+          <Text style={styles.counter}>
+            {step + 1}/{total}
+          </Text>
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <Text style={styles.qMeta}>
+            Soal {step + 1} dari {total} · {quiz.chapterTitle}
+          </Text>
+          <Text style={styles.question}>{q.question}</Text>
+        </View>
+
+        <View style={{ gap: 10 }} accessibilityRole="radiogroup">
+          {q.options.map((opt, oi) => (
+            <Option
+              key={oi}
+              letter={LETTERS[oi]}
+              label={opt}
+              tone={picked === oi ? 'selected' : 'idle'}
+              onPress={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
+            />
+          ))}
+        </View>
+
+        <Text style={styles.hint}>Nilai minimal lulus {quiz.passingScore}. Jawaban dinilai setelah semua soal dikirim.</Text>
+      </ScrollView>
+
+      <View style={[styles.panel, { paddingBottom: insets.bottom + 16, flexDirection: 'row', gap: 10 }]}>
+        {step > 0 && (
+          <Button title="Sebelumnya" variant="outline" onPress={() => setStep((s) => s - 1)} style={{ paddingHorizontal: 18 }} />
+        )}
+        <Button
+          title={isLast ? 'Kirim jawaban' : 'Lanjut'}
+          iconRight={isLast ? 'send' : 'arrow-forward'}
+          onPress={next}
+          disabled={picked === undefined}
+          loading={submitting}
+          style={{ flex: 1 }}
+        />
+      </View>
+    </View>
   );
 }
 
-const optionTone = {
-  idle: { borderColor: colors.border, backgroundColor: '#fff' },
-  selected: { borderColor: colors.primary, backgroundColor: colors.goldSoft },
-  correct: { borderColor: colors.success, backgroundColor: colors.successSoft },
-  wrong: { borderColor: colors.danger, backgroundColor: colors.dangerSoft },
+const BANNER = {
+  success: { bg: colors.successSoft, fg: colors.successInk },
+  gold: { bg: colors.goldSoft, fg: colors.goldInkDark },
+  navy: { bg: colors.navySoft, fg: colors.navy },
 };
 
+function Banner({ icon, text, tone }) {
+  const t = BANNER[tone];
+  return (
+    <View style={[styles.banner, { backgroundColor: t.bg }]}>
+      <Ionicons name={icon} size={20} color={t.fg} />
+      <Text style={[styles.bannerText, { color: t.fg }]}>{text}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  intro: { color: colors.muted, fontSize: 15, marginBottom: space.lg, lineHeight: 21 },
-  qNo: { color: colors.primary, fontWeight: '800', fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase' },
-  question: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 4, marginBottom: space.md, lineHeight: 24 },
-  option: { flexDirection: 'row', alignItems: 'center', gap: space.md, borderWidth: 1.5, borderRadius: radius.md, padding: space.md, marginBottom: space.sm },
-  letter: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.lockedSoft, alignItems: 'center', justifyContent: 'center' },
-  letterText: { fontWeight: '800', color: colors.muted },
-  optionText: { flex: 1, fontSize: 15, color: colors.text, lineHeight: 21 },
-  explain: { backgroundColor: colors.bg, borderRadius: radius.md, padding: space.md, marginTop: space.xs },
-  explainTitle: { fontWeight: '800', marginBottom: 4, color: colors.text },
-  explainText: { color: colors.text, lineHeight: 20 },
-  score: { fontSize: 56, fontWeight: '900', marginTop: space.xs },
-  resultTitle: { fontSize: 19, fontWeight: '800', color: colors.text },
-  resultSub: { color: colors.muted, marginTop: 4, textAlign: 'center' },
-  banner: { marginTop: space.sm, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  topTitle: { ...font.bold, flex: 1, textAlign: 'center', fontSize: 13, color: colors.muted },
+  counter: { ...font.extrabold, fontSize: 14, color: colors.text },
+  qMeta: { ...font.bold, fontSize: 13, color: colors.goldInk },
+  question: { ...font.extrabold, fontSize: 22, lineHeight: 30, color: colors.text },
+  hint: { ...font.regular, fontSize: 13, color: colors.muted, textAlign: 'center' },
+
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    minHeight: 60,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radius.lg,
+    borderWidth: 2,
+  },
+  key: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  keyText: { ...font.extrabold, fontSize: 14 },
+  optionText: { ...font.semibold, flex: 1, fontSize: 16, lineHeight: 22, color: colors.text },
+
+  panel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: space.xl,
+    paddingTop: 18,
+    backgroundColor: colors.bg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+
+  resultCard: { alignItems: 'center', padding: space.xl, borderRadius: radius.xxl, gap: 4 },
+  resultIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  score: { ...font.extrabold, fontSize: 56, lineHeight: 64 },
+  resultTitle: { ...font.extrabold, fontSize: 19, color: colors.text },
+  resultSub: { ...font.medium, fontSize: 13, color: colors.muted, textAlign: 'center' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: radius.lg },
+  bannerText: { ...font.bold, flex: 1, fontSize: 14, lineHeight: 20 },
+
+  h2: { ...font.extrabold, fontSize: 17, color: colors.text, marginTop: 8 },
+  reviewCard: { padding: space.lg, borderRadius: radius.xl, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, gap: 10 },
+  reviewQ: { ...font.bold, fontSize: 16, lineHeight: 23, color: colors.text },
+  explain: { backgroundColor: colors.bg, borderRadius: radius.md, padding: space.md, gap: 4 },
+  explainTitle: { ...font.extrabold, fontSize: 14 },
+  explainText: { ...font.regular, fontSize: 14, lineHeight: 21, color: colors.body },
 });
