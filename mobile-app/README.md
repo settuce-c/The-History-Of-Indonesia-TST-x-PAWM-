@@ -9,9 +9,12 @@ Seluruh data diambil dari backend kelompok sendiri (`core-service`, lihat README
 flowchart TD
   L[Login] <--> R[Daftar Akun]
   L -- login berhasil --> T{{Tab Bar}}
-  T --> B[Belajar: daftar era]
+  T --> H[Beranda: ringkasan & lanjutkan belajar]
+  T --> B[Jelajah: garis waktu era]
   T --> P[Progres]
   T --> F[Profil]
+  H --> C
+  H --> E
   B --> E[Detail Era: daftar bab]
   E --> C[Detail Bab: video, ringkasan, peristiwa, tokoh]
   C --> Q[Kuis -> hasil & pembahasan]
@@ -23,7 +26,8 @@ flowchart TD
 |---|---|---|
 | Login | `src/app/login.js` | `POST /auth/login` |
 | Daftar Akun | `src/app/register.js` | `POST /auth/register` |
-| Belajar (daftar era) | `src/app/(tabs)/index.js` | `GET /eras` |
+| Beranda (dashboard) | `src/app/(tabs)/index.js` | `GET /me/progress` |
+| Jelajah (garis waktu era) | `src/app/(tabs)/explore.js` | `GET /eras` |
 | Detail Era | `src/app/era/[id].js` | `GET /eras/:id/chapters` |
 | Detail Bab | `src/app/chapter/[id].js` | `GET /chapters/:id`, `POST /chapters/:id/watched` |
 | Kuis | `src/app/quiz/[id].js` | `GET /chapters/:id/quiz`, `POST /chapters/:id/quiz/submit` |
@@ -33,6 +37,7 @@ flowchart TD
 - Navigasi: Expo Router (file-based). `Stack.Protected` menjaga layar belajar hanya bisa dibuka setelah login.
 - Login: JWT disimpan di `expo-secure-store` (Keychain/Keystore), sehingga tidak perlu login ulang.
 - Video: embed YouTube lewat `react-native-webview`.
+- Tampilan: palet navy–emas–krem, font Plus Jakarta Sans (`@expo-google-fonts/plus-jakarta-sans`), ornamen kawung dengan `react-native-svg`. Token warna/font di `src/lib/theme.js`.
 
 ## Menjalankan di HP (Expo Go)
 
@@ -42,7 +47,7 @@ flowchart TD
    - produksi: `https://thehistoryofid.stei.site/api`
 3. ```bash
    cd mobile-app
-   npm install
+   npm install --legacy-peer-deps
    npx expo start
    ```
    Jika Expo memilih IP yang salah (ada VirtualBox/VMware), jalankan di PowerShell:
