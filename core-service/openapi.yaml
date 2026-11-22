@@ -1,0 +1,506 @@
+openapi: 3.0.3
+info:
+  title: TheHistoryOfIndonesia — Learning Path Service
+  version: 1.0.0
+  description: |
+    REST API microservice untuk aplikasi belajar sejarah Indonesia (II3160 TST × II3140 PAWM).
+
+    **Autentikasi**
+    - Aplikasi (siswa/admin): `Authorization: Bearer <JWT>` dari `/auth/login` atau `/auth/register`.
+      Klik tombol **Authorize** lalu isi token (tanpa kata "Bearer").
+    - Kelompok lain: header `X-API-Key` (satu key per kelompok, bisa dicabut admin).
+
+    **Aturan bisnis** — era ke-n terbuka jika semua bab era ke-(n−1) selesai; kuis lulus jika skor ≥ 70
+    (percobaan tak terbatas, disimpan nilai tertinggi); bab selesai = video ditonton + kuis lulus;
+    lencana era jika era tuntas dengan rata-rata ≥ 90; akses bab/kuis di era terkunci → 403 `ERA_LOCKED`.
+
+    **Rate limit** (Nginx): 10 request/detik per IP untuk `/api/*` (burst 20), 5 request/menit untuk `/api/auth/*`.
+    Melebihi batas → 429 `RATE_LIMITED`.
+servers:
+  - url: /api
+    description: Server ini (relatif)
+  - url: https://thehistoryofid.stei.site/api
+    description: Produksi (STB via Cloudflare Tunnel)
+tags:
+  - name: System
+  - name: Auth
+  - name: Learning
+    description: Untuk aplikasi (JWT)
+  - name: Admin
+    description: JWT dengan role admin
+  - name: Public (Open Host Service)
+    description: Untuk kelompok lain (X-API-Key)
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+    apiKey: { type: apiKey, in: header, name: X-API-Key }
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+  responses:
+    BadRequest: { description: Input tidak valid, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Token / API key tidak ada atau tidak valid, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Role tidak cukup, era terkunci, atau API key dicabut, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Tidak ditemukan, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: Data bentrok (email/slug sudah dipakai), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    TooMany: { description: Rate limit terlampaui, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: ERA_LOCKED }
+            message: { type: string, example: Era "Kerajaan Islam" masih terkunci. Selesaikan semua bab di era sebelumnya terlebih dahulu. }
+            details:
+              type: array
+              items: { type: object, properties: { field: { type: string }, message: { type: string } } }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        name: { type: string }
+        avatarUrl: { type: string, nullable: true }
+        role: { type: string, enum: [student, admin] }
+        createdAt: { type: string }
+    AuthResult:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        token: { type: string }
+    Era:
+      type: object
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        description: { type: string }
+        startYear: { type: integer }
+        endYear: { type: integer }
+        order: { type: integer }
+    EraStatus:
+      allOf:
+        - $ref: '#/components/schemas/Era'
+        - type: object
+          properties:
+            status: { type: string, enum: [locked, unlocked, completed] }
+            chapterCount: { type: integer }
+            completedChapters: { type: integer }
+            averageScore: { type: number, nullable: true }
+            badgeEarned: { type: boolean }
+    ChapterStatus:
+      type: object
+      properties:
+        id: { type: integer }
+        eraId: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        order: { type: integer }
+        status: { type: string, enum: [locked, not_started, in_progress, completed] }
+        watched: { type: boolean }
+        passed: { type: boolean }
+        bestScore: { type: integer, nullable: true }
+    HistoricalItem:
+      type: object
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [event, figure] }
+        name: { type: string }
+        year: { type: integer }
+        yearEnd: { type: integer, nullable: true }
+        location: { type: string }
+        region: { type: string }
+        coordinates: { type: object, nullable: true, properties: { lat: { type: number }, lng: { type: number } } }
+        description: { type: string }
+    ChapterDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        eraId: { type: integer }
+        title: { type: string }
+        videoUrl: { type: string, example: https://www.youtube.com/watch?v=xxxx }
+        summary: { type: string }
+        topicTags: { type: array, items: { type: string } }
+        era: { type: object, properties: { id: { type: integer }, title: { type: string } } }
+        status: { type: string }
+        watched: { type: boolean }
+        passed: { type: boolean }
+        bestScore: { type: integer, nullable: true }
+        attempts: { type: integer }
+        quiz: { type: object, properties: { questionCount: { type: integer }, passingScore: { type: integer } } }
+        events: { type: array, items: { $ref: '#/components/schemas/HistoricalItem' } }
+        figures: { type: array, items: { $ref: '#/components/schemas/HistoricalItem' } }
+        nextChapter: { type: object, nullable: true }
+    StudentQuestion:
+      type: object
+      description: Soal TANPA kunci jawaban
+      properties:
+        id: { type: integer }
+        order: { type: integer }
+        question: { type: string }
+        options: { type: array, items: { type: string } }
+    FullQuestion:
+      type: object
+      properties:
+        id: { type: integer }
+        chapterId: { type: integer }
+        order: { type: integer }
+        question: { type: string }
+        options: { type: array, items: { type: string } }
+        answerIndex: { type: integer }
+        explanation: { type: string }
+    QuestionInput:
+      type: object
+      required: [question, options, answerIndex]
+      properties:
+        question: { type: string }
+        options: { type: array, minItems: 2, maxItems: 6, items: { type: string } }
+        answerIndex: { type: integer }
+        explanation: { type: string }
+        order: { type: integer }
+    SubmitResult:
+      type: object
+      properties:
+        chapterId: { type: integer }
+        score: { type: integer, example: 80 }
+        passed: { type: boolean }
+        passingScore: { type: integer, example: 70 }
+        correctCount: { type: integer }
+        totalQuestions: { type: integer }
+        attempt: { type: integer }
+        bestScore: { type: integer }
+        chapterCompleted: { type: boolean }
+        eraUnlocked: { type: object, nullable: true, properties: { id: { type: integer }, title: { type: string } } }
+        badgeEarned: { type: object, nullable: true, properties: { eraId: { type: integer }, name: { type: string }, averageScore: { type: number } } }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId: { type: integer }
+              question: { type: string }
+              options: { type: array, items: { type: string } }
+              selectedIndex: { type: integer, nullable: true }
+              correctIndex: { type: integer }
+              correct: { type: boolean }
+              explanation: { type: string }
+    EraInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        startYear: { type: integer }
+        endYear: { type: integer }
+        order: { type: integer }
+    ChapterInput:
+      type: object
+      required: [eraId, title, videoUrl, summary]
+      properties:
+        eraId: { type: integer }
+        title: { type: string }
+        slug: { type: string }
+        order: { type: integer }
+        videoUrl: { type: string, description: Hanya tautan YouTube }
+        summary: { type: string }
+        topicTags: { type: array, items: { type: string } }
+    ApiKey:
+      type: object
+      properties:
+        id: { type: integer }
+        clientName: { type: string }
+        keyPrefix: { type: string }
+        active: { type: boolean }
+        createdAt: { type: string }
+        lastUsedAt: { type: string, nullable: true }
+        revokedAt: { type: string, nullable: true }
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Cek kesehatan service (publik)
+      responses:
+        '200': { description: OK, content: { application/json: { example: { status: ok, service: core-service, version: 1.0.0, database: ok, uptimeSeconds: 42 } } } }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Daftar akun siswa baru
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [email, password, name], properties: { email: { type: string, example: budi@test.id }, password: { type: string, minLength: 8, example: rahasia123 }, name: { type: string, example: Budi } } } } }
+      responses:
+        '201': { description: Terdaftar, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooMany' }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login, mendapatkan JWT
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [email, password], properties: { email: { type: string, example: siswa@thehistoryofid.test }, password: { type: string } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResult' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooMany' }
+
+  /me:
+    get:
+      tags: [Auth]
+      summary: Profil user yang login
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Auth]
+      summary: Ubah nama / avatar
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { name: { type: string, minLength: 2, maxLength: 60 }, avatarUrl: { type: string, nullable: true, description: URL https } } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/progress:
+    get:
+      tags: [Learning]
+      summary: Ringkasan progres, lencana, dan status per era/bab
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /eras:
+    get:
+      tags: [Learning]
+      summary: Semua era + status locked/unlocked/completed
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/EraStatus' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /eras/{id}/chapters:
+    get:
+      tags: [Learning]
+      summary: Daftar bab di sebuah era + status tiap bab
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { era: { $ref: '#/components/schemas/EraStatus' }, data: { type: array, items: { $ref: '#/components/schemas/ChapterStatus' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /chapters/{id}:
+    get:
+      tags: [Learning]
+      summary: Detail bab (video, ringkasan, peristiwa & tokoh)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ChapterDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /chapters/{id}/watched:
+    post:
+      tags: [Learning]
+      summary: Tandai video bab sudah ditonton
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: OK — berisi status bab, chapterCompleted, eraUnlocked, badgeEarned }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /chapters/{id}/quiz:
+    get:
+      tags: [Learning]
+      summary: Soal kuis bab (TANPA kunci jawaban)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { chapterId: { type: integer }, chapterTitle: { type: string }, passingScore: { type: integer }, totalQuestions: { type: integer }, questions: { type: array, items: { $ref: '#/components/schemas/StudentQuestion' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /chapters/{id}/quiz/submit:
+    post:
+      tags: [Learning]
+      summary: Kirim jawaban; penilaian dilakukan di server
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers:
+                  type: array
+                  items: { type: object, required: [questionId, selectedIndex], properties: { questionId: { type: integer }, selectedIndex: { type: integer, minimum: 0 } } }
+            example: { answers: [{ questionId: 1, selectedIndex: 1 }, { questionId: 2, selectedIndex: 2 }] }
+      responses:
+        '200': { description: Hasil penilaian, content: { application/json: { schema: { $ref: '#/components/schemas/SubmitResult' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/eras:
+    get:
+      tags: [Admin]
+      summary: Semua era beserta bab
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      tags: [Admin]
+      summary: Buat era
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EraInput' } } } }
+      responses: { '201': { description: Dibuat, content: { application/json: { schema: { $ref: '#/components/schemas/Era' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/eras/{id}:
+    put:
+      tags: [Admin]
+      summary: Ubah era (sebagian field)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EraInput' } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete:
+      tags: [Admin]
+      summary: Hapus era (beserta bab & soalnya)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Dihapus }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/chapters:
+    post:
+      tags: [Admin]
+      summary: Buat bab
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChapterInput' } } } }
+      responses: { '201': { description: Dibuat }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/chapters/{id}:
+    put:
+      tags: [Admin]
+      summary: Ubah bab (mis. ganti videoUrl placeholder)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ChapterInput' } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete:
+      tags: [Admin]
+      summary: Hapus bab
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Dihapus }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/chapters/{id}/questions:
+    get:
+      tags: [Admin]
+      summary: Soal bab lengkap dengan kunci
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/FullQuestion' } } } } } } } }
+    post:
+      tags: [Admin]
+      summary: Tambah soal
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/QuestionInput' } } } }
+      responses: { '201': { description: Dibuat }, '400': { $ref: '#/components/responses/BadRequest' } }
+  /admin/questions/{id}:
+    put:
+      tags: [Admin]
+      summary: Ubah soal
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/QuestionInput' } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete:
+      tags: [Admin]
+      summary: Hapus soal
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '204': { description: Dihapus }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/api-keys:
+    get:
+      tags: [Admin]
+      summary: Daftar API key kelompok lain (tanpa key mentah)
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ApiKey' } } } } } } } }
+    post:
+      tags: [Admin]
+      summary: Terbitkan / rotasi API key (key mentah hanya ditampilkan sekali)
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [clientName], properties: { clientName: { type: string, example: classroom-service } } } } } }
+      responses: { '201': { description: Diterbitkan, content: { application/json: { schema: { type: object, properties: { apiKey: { type: string }, client: { $ref: '#/components/schemas/ApiKey' } } } } } } }
+  /admin/api-keys/{id}:
+    delete:
+      tags: [Admin]
+      summary: Cabut API key
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Dicabut }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /public/eras:
+    get:
+      tags: [Public (Open Host Service)]
+      summary: Daftar era
+      security: [{ apiKey: [] }]
+      responses: { '200': { description: OK }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /public/learning-path:
+    get:
+      tags: [Public (Open Host Service)]
+      summary: Era + bab berurutan (step 1..n)
+      security: [{ apiKey: [] }]
+      responses: { '200': { description: OK }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /public/quiz:
+    get:
+      tags: [Public (Open Host Service)]
+      summary: Soal + kunci jawaban per topik
+      security: [{ apiKey: [] }]
+      parameters:
+        - { name: topic, in: query, schema: { type: string, example: majapahit } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { topic: { type: string }, count: { type: integer }, data: { type: array, items: { allOf: [{ $ref: '#/components/schemas/FullQuestion' }, { type: object, properties: { chapterTitle: { type: string }, answer: { type: string } } }] } } } } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /public/events:
+    get:
+      tags: [Public (Open Host Service)]
+      summary: Cari peristiwa & tokoh (tahun, lokasi, koordinat)
+      security: [{ apiKey: [] }]
+      parameters:
+        - { name: keyword, in: query, schema: { type: string, example: majapahit } }
+        - { name: kind, in: query, schema: { type: string, enum: [event, figure] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { count: { type: integer }, data: { type: array, items: { $ref: '#/components/schemas/HistoricalItem' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /public/recommendations:
+    get:
+      tags: [Public (Open Host Service)]
+      summary: Bab lanjutan setelah chapterId
+      security: [{ apiKey: [] }]
+      parameters:
+        - { name: chapterId, in: query, required: true, schema: { type: integer } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 10, default: 3 } }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
