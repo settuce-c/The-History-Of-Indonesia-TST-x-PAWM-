@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Api, API_URL, errorMessage } from '../../lib/api';
 import { useSession } from '../../lib/session';
-import { Button, Card, Field, SectionTitle } from '../../components/ui';
-import { colors, space } from '../../lib/theme';
+import { useFetch } from '../../lib/useFetch';
+import { Button, Field, SectionTitle } from '../../components/ui';
+import { Kawung } from '../../components/Ornament';
+import { colors, font, initials, radius, space } from '../../lib/theme';
 
 export default function ProfileScreen() {
   const { user, setUser, signOut } = useSession();
+  const { data: progress } = useFetch(() => Api.progress());
   const [name, setName] = useState(user?.name || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '');
   const [saving, setSaving] = useState(false);
@@ -32,64 +37,125 @@ export default function ProfileScreen() {
     }
   }
 
-  const initials = (user?.name || '?')
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  function confirmSignOut() {
+    Alert.alert('Keluar dari akun?', 'Progresmu tetap tersimpan di server.', [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Keluar', style: 'destructive', onPress: signOut },
+    ]);
+  }
+
   const changed = name !== (user?.name || '') || avatarUrl !== (user?.avatarUrl || '');
+  const s = progress?.summary;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          {user?.avatarUrl ? (
-            <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.initials]}>
-              <Text style={styles.initialsText}>{initials}</Text>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bg }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <View style={styles.hero}>
+            <Kawung size={200} opacity={0.16} style={{ right: -50, top: -50 }} />
+            <View style={styles.avatar}>
+              {user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={StyleSheet.absoluteFill} />
+              ) : (
+                <Text style={styles.avatarText}>{initials(user?.name)}</Text>
+              )}
             </View>
-          )}
-          <Text style={styles.name}>{user?.name}</Text>
-          <Text style={styles.email}>{user?.email}</Text>
-          <Text style={styles.role}>{user?.role === 'admin' ? 'Admin' : 'Siswa'}</Text>
-        </View>
+            <Text style={styles.name}>{user?.name}</Text>
+            <Text style={styles.email}>{user?.email}</Text>
+            <View style={styles.role}>
+              <Text style={styles.roleText}>{user?.role === 'admin' ? 'Admin' : 'Siswa'}</Text>
+            </View>
 
-        <SectionTitle>Ubah Profil</SectionTitle>
-        <Card>
-          <Field label="Nama" value={name} onChangeText={setName} />
-          <Field
-            label="URL Foto Profil (https, opsional)"
-            value={avatarUrl}
-            onChangeText={setAvatarUrl}
-            placeholder="https://..."
-            autoCapitalize="none"
-            keyboardType="url"
-          />
-          <Button title="Simpan" icon="save" onPress={save} loading={saving} disabled={!changed || name.trim().length < 2} />
-        </Card>
+            {s && (
+              <View style={styles.stats}>
+                <Stat value={s.completedChapters} label="Bab selesai" />
+                <View style={styles.divider} />
+                <Stat value={s.averageScore ?? '–'} label="Rata-rata" />
+                <View style={styles.divider} />
+                <Stat value={s.badgeCount} label="Lencana" />
+              </View>
+            )}
+          </View>
 
-        <SectionTitle>Tentang</SectionTitle>
-        <Card>
-          <Text style={styles.about}>TheHistoryOfIndonesia · II3160 TST × II3140 PAWM</Text>
-          <Text style={styles.server}>Server API: {API_URL}</Text>
-        </Card>
+          <SectionTitle>Ubah profil</SectionTitle>
+          <View style={styles.card}>
+            <Field label="Nama" value={name} onChangeText={setName} />
+            <Field
+              label="URL foto profil (https, opsional)"
+              value={avatarUrl}
+              onChangeText={setAvatarUrl}
+              placeholder="https://..."
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+            <Button title="Simpan perubahan" onPress={save} loading={saving} disabled={!changed || name.trim().length < 2} />
+          </View>
 
-        <Button title="Keluar" icon="log-out" variant="danger" onPress={signOut} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <SectionTitle>Tentang aplikasi</SectionTitle>
+          <View style={[styles.card, { gap: 12 }]}>
+            <Row icon="school-outline" title="The History of Indonesia" sub="II3160 TST × II3140 PAWM" />
+            <Row icon="server-outline" title="Server API" sub={API_URL} />
+          </View>
+
+          <Button title="Keluar" icon="log-out-outline" variant="danger" onPress={confirmSignOut} style={{ marginTop: space.xl }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+function Stat({ value, label }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function Row({ icon, title, sub }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View style={styles.rowIcon}>
+        <Ionicons name={icon} size={18} color={colors.navy} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowSub} numberOfLines={1}>
+          {sub}
+        </Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: 'center', marginVertical: space.lg },
-  avatar: { width: 88, height: 88, borderRadius: 44, marginBottom: space.md },
-  initials: { backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  initialsText: { color: colors.gold, fontSize: 32, fontWeight: '800' },
-  name: { fontSize: 22, fontWeight: '800', color: colors.text },
-  email: { color: colors.muted, marginTop: 2 },
-  role: { marginTop: space.sm, backgroundColor: colors.goldSoft, color: colors.primary, fontWeight: '700', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
-  about: { color: colors.text, fontWeight: '600' },
-  server: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  container: { padding: space.xl, paddingTop: space.lg, paddingBottom: 40 },
+  hero: { alignItems: 'center', padding: space.xl, borderRadius: radius.xxl, backgroundColor: colors.navy, overflow: 'hidden' },
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.goldSoft,
+    borderWidth: 3,
+    borderColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: space.md,
+  },
+  avatarText: { ...font.extrabold, color: colors.navy, fontSize: 30 },
+  name: { ...font.extrabold, fontSize: 22, color: '#FFFFFF' },
+  email: { ...font.regular, fontSize: 14, color: colors.onNavy, marginTop: 2 },
+  role: { marginTop: space.sm, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999 },
+  roleText: { ...font.bold, fontSize: 12, color: colors.goldLight },
+  stats: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', marginTop: space.xl },
+  statValue: { ...font.extrabold, fontSize: 20, color: '#FFFFFF' },
+  statLabel: { ...font.medium, fontSize: 11, color: colors.onNavy },
+  divider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.18)' },
+
+  card: { padding: space.lg, borderRadius: radius.xl, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  rowIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.navySoft, alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { ...font.bold, fontSize: 14, color: colors.text },
+  rowSub: { ...font.regular, fontSize: 12, color: colors.muted },
 });
