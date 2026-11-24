@@ -8,6 +8,8 @@ import { Api, errorMessage } from '../../lib/api';
 import { useFetch } from '../../lib/useFetch';
 import { Button, ErrorView, IconButton, Loading } from '../../components/ui';
 import { VideoPlayer } from '../../components/VideoPlayer';
+import { WikiCard } from '../../components/WikiCard';
+import { FigureModal } from '../../components/FigureModal';
 import { colors, font, initials, radius, space } from '../../lib/theme';
 
 const AVATAR_TONES = [
@@ -36,6 +38,7 @@ export default function ChapterScreen() {
   const insets = useSafeAreaInsets();
   const { data: ch, error, loading, refreshing, refresh, reload } = useFetch(() => Api.chapter(id), [id]);
   const [marking, setMarking] = useState(false);
+  const [figure, setFigure] = useState(null); // tokoh yang detailnya sedang dibuka
 
   if (loading) return <Loading />;
   if (error && !ch) return <ErrorView error={error} onRetry={reload} />;
@@ -95,6 +98,15 @@ export default function ChapterScreen() {
           </View>
         </View>
 
+        {ch.status === 'skipped' && (
+          <View style={styles.skippedNote}>
+            <Ionicons name="play-skip-forward" size={18} color={colors.navy} />
+            <Text style={styles.skippedText}>
+              Bab ini dilewati lewat tes, jadi sudah dihitung selesai. Kamu tetap boleh mempelajarinya dan mengerjakan kuisnya.
+            </Text>
+          </View>
+        )}
+
         {!ch.watched && (
           <Button title="Tandai video sudah ditonton" icon="eye-outline" variant="outline" loading={marking} onPress={markWatched} />
         )}
@@ -128,7 +140,7 @@ export default function ChapterScreen() {
                 return (
                   <Pressable
                     key={f.id}
-                    onPress={() => Alert.alert(f.name, `${yearLabel(f)} · ${f.location}, ${f.region}\n\n${f.description}`)}
+                    onPress={() => setFigure(f)}
                     style={styles.figure}
                     accessibilityRole="button"
                   >
@@ -165,6 +177,8 @@ export default function ChapterScreen() {
           </View>
         )}
 
+        <WikiCard wiki={ch.wikiSummary} />
+
         {ch.nextChapter && (
           <Pressable onPress={() => router.replace(`/chapter/${ch.nextChapter.id}`)} style={styles.next}>
             <View style={{ flex: 1 }}>
@@ -175,6 +189,8 @@ export default function ChapterScreen() {
           </Pressable>
         )}
       </ScrollView>
+
+      <FigureModal figure={figure} onClose={() => setFigure(null)} />
 
       {/* Bilah bawah */}
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 14 }]}>
@@ -204,6 +220,8 @@ const styles = StyleSheet.create({
   stepText: { ...font.semibold, fontSize: 13, color: colors.muted },
   paragraph: { ...font.regular, fontSize: 16, lineHeight: 27, color: colors.body },
 
+  skippedNote: { flexDirection: 'row', gap: 10, alignItems: 'center', padding: 14, borderRadius: radius.lg, backgroundColor: colors.navySoft },
+  skippedText: { ...font.semibold, flex: 1, fontSize: 13, lineHeight: 19, color: colors.navy },
   tip: { flexDirection: 'row', gap: 12, padding: space.lg, borderRadius: radius.lg, backgroundColor: colors.navySoft },
   tipIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
   tipTitle: { ...font.extrabold, fontSize: 13, color: colors.navy },

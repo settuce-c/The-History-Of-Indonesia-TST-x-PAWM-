@@ -1,4 +1,4 @@
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -6,9 +6,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Api } from '../../lib/api';
 import { useSession } from '../../lib/session';
 import { useFetch } from '../../lib/useFetch';
-import { ErrorView, Loading, ProgressBar, SectionTitle } from '../../components/ui';
+import { Avatar } from '../../components/Avatar';
+import { Button, ErrorView, Loading, ProgressBar, SectionTitle } from '../../components/ui';
 import { Kawung } from '../../components/Ornament';
-import { colors, font, initials, radius, space } from '../../lib/theme';
+import { colors, font, radius, space } from '../../lib/theme';
 
 function greeting() {
   const h = new Date().getHours();
@@ -22,7 +23,8 @@ function greeting() {
 function findNext(eras) {
   for (const era of eras) {
     if (era.status !== 'unlocked') continue;
-    const idx = era.chapters.findIndex((c) => c.status !== 'completed');
+    // Bab yang dilewati lewat tes tidak perlu dikerjakan lagi.
+    const idx = era.chapters.findIndex((c) => c.status !== 'completed' && c.status !== 'skipped');
     if (idx >= 0) return { era, chapter: era.chapters[idx], index: idx };
   }
   return null;
@@ -38,6 +40,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useSession();
   const { data, error, loading, refreshing, refresh, reload } = useFetch(() => Api.progress());
+  const { data: placement } = useFetch(() => Api.myPlacement());
 
   if (loading) return <Loading />;
   if (error && !data) return <ErrorView error={error} onRetry={reload} />;
@@ -57,16 +60,12 @@ export default function HomeScreen() {
         {/* Sapaan */}
         <View style={styles.header}>
           <Pressable onPress={() => router.navigate('/profile')} accessibilityLabel="Buka profil" style={styles.avatar}>
-            {user?.avatarUrl ? (
-              <Image source={{ uri: user.avatarUrl }} style={StyleSheet.absoluteFill} />
-            ) : (
-              <Text style={styles.avatarText}>{initials(user?.name)}</Text>
-            )}
+            <Avatar user={user} size={48} />
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.hello}>{greeting()}</Text>
             <Text style={styles.name} numberOfLines={1}>
-              {user?.name || 'Pelajar'}
+              {user?.name || 'Sahabat Sejarah'}
             </Text>
           </View>
         </View>
@@ -98,6 +97,20 @@ export default function HomeScreen() {
             {summary.averageScore != null && <Text style={{ color: '#FFFFFF', ...font.bold }}>{summary.averageScore}</Text>}
           </Text>
         </View>
+
+        {/* Ajakan tes awal (hanya jika belum pernah) */}
+        {placement && !placement.taken && (
+          <View style={styles.placementCard}>
+            <View style={styles.placementIcon}>
+              <Ionicons name="flash" size={22} color={colors.gold} />
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={styles.placementTitle}>Sudah tahu sejarah Indonesia?</Text>
+              <Text style={styles.placementText}>Ikuti tes awal, lewati era yang sudah kamu kuasai, dan mulai dari yang belum dipahami.</Text>
+              <Button title="Ikuti tes awal" variant="gold" onPress={() => router.push('/placement')} style={{ minHeight: 44, marginTop: 6 }} />
+            </View>
+          </View>
+        )}
 
         {/* Lanjutkan belajar */}
         {next && (
@@ -203,16 +216,11 @@ const styles = StyleSheet.create({
   container: { padding: space.xl, paddingTop: space.lg, paddingBottom: 40 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: space.xl },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.navy,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarText: { ...font.extrabold, color: colors.goldLight, fontSize: 16 },
+  avatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden' },
+  placementCard: { flexDirection: 'row', gap: 14, padding: space.lg, borderRadius: radius.xl, backgroundColor: colors.navy, marginBottom: space.md },
+  placementIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  placementTitle: { ...font.extrabold, fontSize: 15, color: '#FFFFFF' },
+  placementText: { ...font.regular, fontSize: 13, lineHeight: 19, color: colors.onNavy },
   hello: { ...font.regular, fontSize: 13, color: colors.muted },
   name: { ...font.extrabold, fontSize: 18, color: colors.text },
 

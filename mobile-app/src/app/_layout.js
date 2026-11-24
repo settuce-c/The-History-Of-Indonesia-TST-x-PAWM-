@@ -53,6 +53,11 @@ function RootNavigator() {
         <Stack.Screen name="era/[id]" />
         <Stack.Screen name="chapter/[id]" options={{ contentStyle: { backgroundColor: colors.card } }} />
         <Stack.Screen name="quiz/[id]" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="onboarding" options={{ gestureEnabled: false, contentStyle: { backgroundColor: colors.navyDeep } }} />
+        <Stack.Screen name="placement" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="placement-result" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="test-out/[id]" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="how-it-works" options={{ presentation: 'modal' }} />
       </Stack.Protected>
 
       <Stack.Protected guard={!signedIn} redirectTo="/(tabs)">

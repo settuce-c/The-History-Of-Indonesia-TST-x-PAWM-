@@ -37,7 +37,7 @@ export default function ProgressScreen() {
         <ScreenTitle title="Progres belajarmu" subtitle="Semua yang sudah kamu pelajari, di satu tempat." />
 
         <View style={styles.grid}>
-          <Tile label="Bab selesai" icon="book-outline" value={`${summary.completedChapters}/${summary.totalChapters}`} note={`${pct}% materi`} />
+          <Tile label="Bab selesai" icon="book-outline" value={`${summary.completedChapters}/${summary.totalChapters}`} note={summary.skippedChapters > 0 ? `${pct}% materi · ${summary.skippedChapters} dilewati` : `${pct}% materi`} />
           <Tile label="Era tuntas" icon="flag-outline" value={`${summary.completedEras}/${summary.totalEras}`} />
           <Tile label="Rata-rata nilai" icon="stats-chart-outline" value={summary.averageScore ?? '–'} note={summary.averageScore != null ? 'nilai terbaik per bab' : 'belum ada kuis'} />
           <Tile label="Lencana" icon="medal-outline" value={summary.badgeCount} />
@@ -60,7 +60,7 @@ export default function ProgressScreen() {
             );
           })}
         </View>
-        <Text style={styles.hint}>Lencana diberikan saat satu era tuntas dengan rata-rata nilai minimal 90.</Text>
+        <Text style={styles.hint}>Lencana diberikan saat satu era diselesaikan lewat kuis bab dengan rata-rata minimal 90. Bab yang dilewati lewat tes tidak memberi lencana.</Text>
 
         <SectionTitle>Nilai per bab</SectionTitle>
         <View style={{ gap: 12 }}>
@@ -71,7 +71,7 @@ export default function ProgressScreen() {
                 {era.status === 'locked' ? <Pill icon="lock-closed">Terkunci</Pill> : <StatusBadge status={era.status} />}
               </View>
               {era.chapters.map((c) => {
-                const s = statusStyle[c.status] || statusStyle.not_started;
+                const s = statusStyle[c.status] || statusStyle.available;
                 return (
                   <View key={c.id} style={styles.chapterRow}>
                     <Ionicons name={s.icon} size={18} color={c.status === 'completed' ? colors.success : s.color} />

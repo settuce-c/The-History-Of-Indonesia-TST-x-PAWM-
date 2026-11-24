@@ -95,7 +95,7 @@ export function Pill({ children, color = colors.muted, bg = colors.sand, icon, s
 }
 
 export function StatusBadge({ status }) {
-  const s = statusStyle[status] || statusStyle.not_started;
+  const s = statusStyle[status] || statusStyle.available;
   return (
     <Pill color={s.color} bg={s.bg}>
       {s.label}

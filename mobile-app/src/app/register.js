@@ -44,7 +44,7 @@ export default function RegisterScreen() {
 
           <Text style={styles.kicker}>Akun baru</Text>
           <Text style={styles.title}>Mulai perjalananmu menelusuri sejarah.</Text>
-          <Text style={styles.subtitle}>Buat akun siswa untuk menyimpan progres, nilai kuis, dan lencanamu.</Text>
+          <Text style={styles.subtitle}>Buat akun untuk menyimpan progres, nilai kuis, dan lencanamu.</Text>
 
           <View style={{ marginTop: space.xl }}>
             <Field dark label="Nama" value={name} onChangeText={setName} placeholder="Nama lengkap" textContentType="name" />

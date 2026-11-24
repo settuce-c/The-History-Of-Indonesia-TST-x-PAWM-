@@ -80,4 +80,13 @@ export const Api = {
   quiz: (id) => request(`/chapters/${id}/quiz`),
   submitQuiz: (id, answers) => request(`/chapters/${id}/quiz/submit`, { method: 'POST', body: { answers } }),
   progress: () => request('/me/progress'),
+  // Tes awal & tes lompat
+  myPlacement: () => request('/me/placement'),
+  placement: (retake) => request(`/placement${retake ? '?retake=true' : ''}`),
+  submitPlacement: (answers, retake) =>
+    request('/placement/submit', { method: 'POST', body: { answers, ...(retake ? { retake: true } : {}) } }),
+  testOutQuiz: (eraId) => request(`/eras/${eraId}/test-out`),
+  submitTestOut: (eraId, answers) => request(`/eras/${eraId}/test-out`, { method: 'POST', body: { answers } }),
+  // Detail tokoh/peristiwa + ringkasan Wikipedia
+  item: (id) => request(`/items/${id}`),
 };

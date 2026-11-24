@@ -1,5 +1,7 @@
+import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSession } from '../../lib/session';
 import { colors, font } from '../../lib/theme';
 
 const icon =
@@ -7,6 +9,9 @@ const icon =
   ({ color, focused }) => <Ionicons name={focused ? name : `${name}-outline`} size={24} color={color} />;
 
 export default function TabLayout() {
+  const { onboarding } = useSession();
+  // Akun yang baru didaftarkan wajib melewati onboarding dulu.
+  if (onboarding) return <Redirect href="/onboarding" />;
   return (
     <Tabs
       screenOptions={{

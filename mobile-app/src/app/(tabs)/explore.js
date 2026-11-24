@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Api } from '../../lib/api';
 import { useFetch } from '../../lib/useFetch';
-import { ErrorView, Loading, Pill, ProgressBar, ScreenTitle } from '../../components/ui';
+import { Button, ErrorView, IconButton, Loading, Pill, ProgressBar, ScreenTitle } from '../../components/ui';
 import { colors, font, radius, space } from '../../lib/theme';
 
 const FILTERS = [
@@ -35,7 +35,12 @@ export default function ExploreScreen() {
         contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.navy} />}
       >
-        <ScreenTitle title="Jelajah Era" subtitle="Ikuti garis waktu sejarah Indonesia. Selesaikan semua bab di satu era untuk membuka era berikutnya." />
+        <View style={styles.titleRow}>
+          <View style={{ flex: 1 }}>
+            <ScreenTitle title="Jelajah Era" subtitle="Ikuti garis waktu sejarah Indonesia. Selesaikan atau lewati semua bab di satu era untuk membuka era berikutnya." />
+          </View>
+          <IconButton icon="information-circle-outline" label="Cara kerja belajar" onPress={() => router.push('/how-it-works')} />
+        </View>
 
         <View style={styles.segment} accessibilityRole="tablist">
           {FILTERS.map(([key, label]) => {
@@ -97,7 +102,7 @@ export default function ExploreScreen() {
                 ) : (
                   <Pressable
                     onPress={() => router.push(`/era/${e.id}`)}
-                    style={({ pressed }) => [styles.card, !done && { opacity: 0.75 }, pressed && { opacity: 0.6 }]}
+                    style={({ pressed }) => [styles.card, !done && { backgroundColor: colors.sand, borderColor: colors.sand }, pressed && { opacity: 0.8 }]}
                   >
                     <View style={[styles.row, { justifyContent: 'space-between' }]}>
                       <Text style={styles.years}>{years(e)}</Text>
@@ -114,6 +119,23 @@ export default function ExploreScreen() {
                       {e.description}
                     </Text>
                     {done && e.averageScore != null && <Text style={styles.score}>Rata-rata nilai {e.averageScore}</Text>}
+                    {done && e.skippedChapters > 0 && <Text style={styles.skipped}>{e.skippedChapters} bab dilewati lewat tes</Text>}
+                    {e.status === 'locked' && (
+                      <View style={{ gap: 10, marginTop: 4 }}>
+                        <Text style={styles.lockReason}>
+                          {e.lock?.message || 'Selesaikan semua bab di era sebelumnya untuk membuka era ini.'}
+                        </Text>
+                        {e.lock?.testOutAvailable && (
+                          <Button
+                            title="Tes lompat ke era ini"
+                            icon="play-skip-forward"
+                            variant="gold"
+                            onPress={() => router.push(`/test-out/${e.id}`)}
+                            style={{ minHeight: 46 }}
+                          />
+                        )}
+                      </View>
+                    )}
                   </Pressable>
                 )}
               </View>
@@ -128,6 +150,7 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: { padding: space.xl, paddingTop: space.lg, paddingBottom: 40 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   segment: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: radius.md, backgroundColor: colors.sand, marginBottom: space.xl },
   segBtn: { flex: 1, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   segBtnOn: { backgroundColor: colors.card, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
@@ -151,4 +174,6 @@ const styles = StyleSheet.create({
   title: { ...font.extrabold, fontSize: 16, color: colors.text },
   desc: { ...font.regular, fontSize: 13, lineHeight: 20, color: colors.muted },
   score: { ...font.semibold, fontSize: 12, color: colors.successInk },
+  skipped: { ...font.semibold, fontSize: 12, color: colors.navy },
+  lockReason: { ...font.medium, fontSize: 12, lineHeight: 18, color: colors.goldInkDark },
 });

@@ -47,9 +47,11 @@ export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 };
 export const statusStyle = {
   locked: { label: 'Terkunci', color: colors.muted, bg: colors.sand, icon: 'lock-closed' },
   unlocked: { label: 'Berjalan', color: colors.navy, bg: colors.navySoft, icon: 'play' },
+  available: { label: 'Siap dipelajari', color: colors.muted, bg: colors.sand, icon: 'ellipse-outline' },
   not_started: { label: 'Belum mulai', color: colors.muted, bg: colors.sand, icon: 'ellipse-outline' },
   in_progress: { label: 'Sedang belajar', color: colors.goldInk, bg: colors.goldSoft, icon: 'time' },
   completed: { label: 'Selesai', color: colors.successInk, bg: colors.successSoft, icon: 'checkmark-circle' },
+  skipped: { label: 'Dilewati', color: colors.navy, bg: colors.navySoft, icon: 'play-skip-forward' },
 };
 
 export function initials(name = '?') {

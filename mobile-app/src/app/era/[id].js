@@ -30,11 +30,12 @@ export default function EraScreen() {
   const { era } = data;
   const chapters = data.data;
   const locked = era.status === 'locked';
-  const current = chapters.find((c) => c.status !== 'completed' && c.status !== 'locked');
+  const current = chapters.find((c) => !['completed', 'skipped', 'locked'].includes(c.status));
+  const eraDone = era.status === 'completed';
 
   function open(c) {
     if (c.status === 'locked') {
-      Alert.alert('Bab terkunci', 'Selesaikan semua bab di era sebelumnya terlebih dahulu.');
+      Alert.alert('Bab terkunci', era.lock?.message || 'Selesaikan semua bab di era sebelumnya atau ikuti tes lompat.');
       return;
     }
     router.push(`/chapter/${c.id}`);
@@ -71,8 +72,19 @@ export default function EraScreen() {
           {locked && (
             <View style={styles.lockNote}>
               <Ionicons name="lock-closed" size={18} color={colors.goldInkDark} />
-              <Text style={styles.lockText}>Selesaikan semua bab di era sebelumnya untuk membuka era ini.</Text>
+              <Text style={styles.lockText}>
+                {era.lock?.message || 'Selesaikan semua bab di era sebelumnya untuk membuka era ini.'}
+              </Text>
             </View>
+          )}
+          {locked && era.lock?.testOutAvailable && (
+            <Button title="Tes lompat ke era ini" icon="play-skip-forward" variant="gold" onPress={() => router.push(`/test-out/${era.id}`)} />
+          )}
+          {!locked && !eraDone && (
+            <Pressable onPress={() => router.push(`/test-out/${era.id}`)} accessibilityRole="button" style={({ pressed }) => [styles.testOutLink, pressed && { opacity: 0.7 }]}>
+              <Ionicons name="play-skip-forward-outline" size={18} color={colors.navy} />
+              <Text style={styles.testOutText}>Sudah paham era ini? Ikuti tes lompat</Text>
+            </Pressable>
           )}
 
           <View style={styles.listHead}>
@@ -85,9 +97,11 @@ export default function EraScreen() {
           {chapters.map((c, i) => {
             const isCurrent = current && c.id === current.id;
             const done = c.status === 'completed';
+            const skipped = c.status === 'skipped';
             const isLocked = c.status === 'locked';
             let sub = `Bab ${i + 1}`;
             if (done) sub += ` · nilai terbaik ${c.bestScore}`;
+            else if (skipped) sub += ' · dilewati lewat tes (tetap boleh dipelajari)';
             else if (isCurrent) sub = c.status === 'in_progress' ? `Sedang dipelajari · ${(c.watched ? 50 : 0) + (c.passed ? 50 : 0)}%` : 'Siap dipelajari';
             else if (isLocked) sub += ' · terkunci';
             return (
@@ -104,11 +118,13 @@ export default function EraScreen() {
                 <View
                   style={[
                     styles.num,
-                    { backgroundColor: done ? colors.success : isCurrent ? colors.gold : isLocked ? colors.card : colors.sand },
+                    { backgroundColor: done ? colors.success : skipped ? colors.navySoft : isCurrent ? colors.gold : isLocked ? colors.card : colors.sand },
                   ]}
                 >
                   {done ? (
                     <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                  ) : skipped ? (
+                    <Ionicons name="play-skip-forward" size={16} color={colors.navy} />
                   ) : isLocked ? (
                     <Ionicons name="lock-closed" size={16} color={colors.muted} />
                   ) : (
@@ -131,7 +147,7 @@ export default function EraScreen() {
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={styles.chTitle}>Lencana {era.title}</Text>
               <Text style={styles.chSub}>
-                {era.badgeEarned ? 'Sudah kamu raih!' : 'Tuntaskan semua bab dengan rata-rata nilai ≥ 90'}
+                {era.badgeEarned ? 'Sudah kamu raih!' : 'Selesaikan semua bab lewat kuis dengan rata-rata ≥ 90 (bab yang dilewati tidak memberi lencana)'}
               </Text>
             </View>
           </View>
@@ -176,6 +192,8 @@ const styles = StyleSheet.create({
   heroPillText: { ...font.semibold, fontSize: 12, color: '#FFFFFF' },
 
   lockNote: { flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: colors.goldSoft, padding: 14, borderRadius: radius.lg },
+  testOutLink: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  testOutText: { ...font.bold, fontSize: 13, color: colors.navy, textDecorationLine: 'underline' },
   lockText: { ...font.semibold, flex: 1, fontSize: 13, color: colors.goldInkDark, lineHeight: 19 },
   listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 },
   h2: { ...font.extrabold, fontSize: 17, color: colors.text },
