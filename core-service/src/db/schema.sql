@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   email         TEXT    NOT NULL UNIQUE COLLATE NOCASE,
   password_hash TEXT    NOT NULL,
   name          TEXT    NOT NULL,
-  avatar_url    TEXT,
+  avatar_url    TEXT,                       -- tidak dipakai lagi (revisi 24 Nov); diganti avatar_id
+  avatar_id     TEXT,                       -- id avatar bawaan aplikasi, mis. 'candi' (bukan URL)
   role          TEXT    NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'admin')),
   created_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -44,7 +45,8 @@ CREATE TABLE IF NOT EXISTS chapters (
   order_index INTEGER NOT NULL,
   video_url   TEXT    NOT NULL,
   summary     TEXT    NOT NULL,
-  topic_tags  TEXT    NOT NULL DEFAULT ''
+  topic_tags  TEXT    NOT NULL DEFAULT '',
+  wiki_title  TEXT                        -- judul artikel id.wikipedia.org untuk "Baca lebih lanjut"
 );
 CREATE INDEX IF NOT EXISTS idx_chapters_era ON chapters(era_id, order_index);
 
@@ -59,7 +61,8 @@ CREATE TABLE IF NOT EXISTS historical_items (
   region      TEXT,
   latitude    REAL,
   longitude   REAL,
-  description TEXT
+  description TEXT,
+  wiki_title  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS chapter_items (
@@ -76,7 +79,9 @@ CREATE TABLE IF NOT EXISTS questions (
   options      TEXT    NOT NULL,          -- array JSON berisi pilihan jawaban
   answer_index INTEGER NOT NULL,          -- KUNCI JAWABAN: tidak pernah dikirim sebelum submit
   explanation  TEXT    NOT NULL DEFAULT '',
-  order_index  INTEGER NOT NULL DEFAULT 0
+  order_index  INTEGER NOT NULL DEFAULT 0,
+  source       TEXT    NOT NULL DEFAULT 'manual',    -- 'manual' (ditulis admin/seed) | 'ai' (dibuat Gemini)
+  status       TEXT    NOT NULL DEFAULT 'approved'   -- 'draft' (belum dipakai) | 'approved' (dipakai di kuis)
 );
 CREATE INDEX IF NOT EXISTS idx_questions_chapter ON questions(chapter_id, order_index);
 
@@ -98,6 +103,8 @@ CREATE TABLE IF NOT EXISTS chapter_progress (
   watched_at TEXT,
   best_score INTEGER,
   passed_at  TEXT,
+  skipped_at TEXT,                        -- dilewati lewat tes awal / tes lompat
+  skip_source TEXT,                       -- 'placement' | 'test_out'
   PRIMARY KEY (user_id, chapter_id)
 );
 
@@ -107,4 +114,36 @@ CREATE TABLE IF NOT EXISTS era_badges (
   average_score REAL    NOT NULL,
   awarded_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   PRIMARY KEY (user_id, era_id)
+);
+
+-- Soal yang DITERBITKAN untuk satu sesi tes awal / tes lompat. Disimpan di server supaya saat
+-- submit, server tahu persis soal mana yang diberikan (pengguna tidak bisa memilih soal sendiri).
+CREATE TABLE IF NOT EXISTS test_sessions (
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind         TEXT    NOT NULL CHECK (kind IN ('placement', 'test_out')),
+  ref_id       INTEGER NOT NULL DEFAULT 0,  -- id era untuk test_out; 0 untuk placement
+  question_ids TEXT    NOT NULL,            -- array JSON id soal
+  created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  PRIMARY KEY (user_id, kind, ref_id)
+);
+
+-- Hasil tes awal terakhir per pengguna.
+CREATE TABLE IF NOT EXISTS placement_results (
+  user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  scores       TEXT    NOT NULL,            -- JSON: [{ eraId, score, correct, total, mastered }]
+  start_era_id INTEGER,
+  taken_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- ===== Integrasi Wikipedia =====
+-- Cache ringkasan artikel supaya Wikipedia tidak dipanggil setiap request.
+CREATE TABLE IF NOT EXISTS wiki_cache (
+  title       TEXT PRIMARY KEY,
+  found       INTEGER NOT NULL,             -- 1 = artikel ada, 0 = tidak ditemukan (di-cache singkat)
+  display_title TEXT,
+  extract     TEXT,
+  description TEXT,
+  page_url    TEXT,
+  thumbnail   TEXT,
+  fetched_at  TEXT    NOT NULL
 );

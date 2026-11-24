@@ -21,6 +21,7 @@ const errors = {
       'ERA_LOCKED',
       `Era "${eraTitle}" masih terkunci. Selesaikan semua bab di era sebelumnya terlebih dahulu.`
     ),
+  ai: (status, code, message) => new AppError(status, code, message),
   notFound: (message = 'Resource tidak ditemukan') => new AppError(404, 'NOT_FOUND', message),
   conflict: (message) => new AppError(409, 'CONFLICT', message),
 };

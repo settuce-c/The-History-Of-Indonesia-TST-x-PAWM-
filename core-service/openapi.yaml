@@ -10,9 +10,17 @@ info:
       Klik tombol **Authorize** lalu isi token (tanpa kata "Bearer").
     - Kelompok lain: header `X-API-Key` (satu key per kelompok, bisa dicabut admin).
 
-    **Aturan bisnis** — era ke-n terbuka jika semua bab era ke-(n−1) selesai; kuis lulus jika skor ≥ 70
+    **Aturan bisnis** — era ke-n terbuka jika semua bab era ke-(n−1) selesai **atau dilewati**; kuis lulus jika skor ≥ 70
     (percobaan tak terbatas, disimpan nilai tertinggi); bab selesai = video ditonton + kuis lulus;
-    lencana era jika era tuntas dengan rata-rata ≥ 90; akses bab/kuis di era terkunci → 403 `ERA_LOCKED`.
+    lencana era hanya jika era diselesaikan lewat kuis bab (tidak ada bab yang dilewati) dengan rata-rata ≥ 90;
+    akses bab/kuis di era terkunci → 403 `ERA_LOCKED`.
+
+    **Alur belajar ala Duolingo** — pengguna umum boleh mengikuti **tes awal** (`/placement`) atau **tes lompat** per era
+    (`/eras/{id}/test-out`). Era dengan skor ≥ 80 dianggap dikuasai: semua babnya berstatus `skipped`
+    (dihitung selesai untuk membuka era berikutnya, tetapi tidak memberi lencana).
+
+    **Integrasi eksternal** — soal draf dibuat oleh Gemini API (hanya admin, perlu disetujui) dan ringkasan
+    "Baca lebih lanjut" diambil dari Wikipedia bahasa Indonesia (di-cache 7 hari, sumber: CC BY-SA 4.0).
 
     **Rate limit** (Nginx): 10 request/detik per IP untuk `/api/*` (burst 20), 5 request/menit untuk `/api/auth/*`.
     Melebihi batas → 429 `RATE_LIMITED`.
@@ -26,6 +34,8 @@ tags:
   - name: Auth
   - name: Learning
     description: Untuk aplikasi (JWT)
+  - name: Placement
+    description: Tes awal & tes lompat (JWT)
   - name: Admin
     description: JWT dengan role admin
   - name: Public (Open Host Service)
@@ -67,7 +77,7 @@ components:
         id: { type: integer }
         email: { type: string }
         name: { type: string }
-        avatarUrl: { type: string, nullable: true }
+        avatarId: { type: string, nullable: true, enum: [candi, keris, wayang, pinisi, batik, gunungan, rumah-gadang, garuda], description: Avatar bawaan aplikasi; null = tampilkan inisial }
         role: { type: string, enum: [student, admin] }
         createdAt: { type: string }
     AuthResult:
@@ -92,9 +102,19 @@ components:
           properties:
             status: { type: string, enum: [locked, unlocked, completed] }
             chapterCount: { type: integer }
-            completedChapters: { type: integer }
+            completedChapters: { type: integer, description: Bab selesai, termasuk yang dilewati }
+            skippedChapters: { type: integer }
             averageScore: { type: number, nullable: true }
             badgeEarned: { type: boolean }
+            lock:
+              type: object
+              nullable: true
+              description: Hanya terisi pada era terkunci
+              properties:
+                reason: { type: string, example: PREVIOUS_ERA_INCOMPLETE }
+                message: { type: string }
+                previousEra: { type: object, nullable: true, properties: { id: { type: integer }, title: { type: string } } }
+                testOutAvailable: { type: boolean, description: Era punya soal sehingga tombol Tes lompat bisa dipakai }
     ChapterStatus:
       type: object
       properties:
@@ -103,7 +123,7 @@ components:
         slug: { type: string }
         title: { type: string }
         order: { type: integer }
-        status: { type: string, enum: [locked, not_started, in_progress, completed] }
+        status: { type: string, enum: [locked, available, in_progress, completed, skipped] }
         watched: { type: boolean }
         passed: { type: boolean }
         bestScore: { type: integer, nullable: true }
@@ -119,6 +139,20 @@ components:
         region: { type: string }
         coordinates: { type: object, nullable: true, properties: { lat: { type: number }, lng: { type: number } } }
         description: { type: string }
+        wikiTitle: { type: string, nullable: true }
+    WikiSummary:
+      type: object
+      nullable: true
+      description: Ringkasan dari Wikipedia; null jika tidak tersedia (materi tetap dikembalikan)
+      properties:
+        title: { type: string }
+        description: { type: string, nullable: true }
+        extract: { type: string }
+        url: { type: string }
+        thumbnail: { type: string, nullable: true }
+        source: { type: object, properties: { name: { type: string }, license: { type: string, example: CC BY-SA 4.0 }, licenseUrl: { type: string } } }
+        fetchedAt: { type: string }
+        cached: { type: boolean }
     ChapterDetail:
       type: object
       properties:
@@ -128,6 +162,8 @@ components:
         videoUrl: { type: string, example: https://www.youtube.com/watch?v=xxxx }
         summary: { type: string }
         topicTags: { type: array, items: { type: string } }
+        wikiTitle: { type: string, nullable: true }
+        wikiSummary: { $ref: '#/components/schemas/WikiSummary' }
         era: { type: object, properties: { id: { type: integer }, title: { type: string } } }
         status: { type: string }
         watched: { type: boolean }
@@ -156,6 +192,8 @@ components:
         options: { type: array, items: { type: string } }
         answerIndex: { type: integer }
         explanation: { type: string }
+        source: { type: string, enum: [manual, ai], description: ai = dibuat oleh Gemini }
+        status: { type: string, enum: [draft, approved], description: Hanya approved yang dipakai di kuis }
     QuestionInput:
       type: object
       required: [question, options, answerIndex]
@@ -212,6 +250,21 @@ components:
         videoUrl: { type: string, description: Hanya tautan YouTube }
         summary: { type: string }
         topicTags: { type: array, items: { type: string } }
+        wikiTitle: { type: string, nullable: true, description: Judul artikel id.wikipedia.org }
+    TestQuestion:
+      allOf:
+        - $ref: '#/components/schemas/StudentQuestion'
+        - type: object
+          properties:
+            eraId: { type: integer }
+            eraTitle: { type: string }
+    AnswerList:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items: { type: object, required: [questionId, selectedIndex], properties: { questionId: { type: integer }, selectedIndex: { type: integer, minimum: 0 } } }
     ApiKey:
       type: object
       properties:
@@ -266,11 +319,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
     put:
       tags: [Auth]
-      summary: Ubah nama / avatar
+      summary: Ubah nama / pilih avatar bawaan (URL foto tidak didukung lagi)
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, properties: { name: { type: string, minLength: 2, maxLength: 60 }, avatarUrl: { type: string, nullable: true, description: URL https } } } } }
+        content: { application/json: { schema: { type: object, properties: { name: { type: string, minLength: 2, maxLength: 60 }, avatarId: { type: string, nullable: true, enum: [candi, keris, wayang, pinisi, batik, gunungan, rumah-gadang, garuda] } } } } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -435,6 +488,110 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/Id' }]
       responses: { '204': { description: Dihapus }, '404': { $ref: '#/components/responses/NotFound' } }
+  /me/placement:
+    get:
+      tags: [Placement]
+      summary: Apakah pengguna sudah mengikuti tes awal? + hasil terakhir
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: "{ taken: false } atau { taken: true, takenAt, eras[], masteredEras[], startEra }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /placement:
+    get:
+      tags: [Placement]
+      summary: Soal tes awal — ±2 soal acak per era, TANPA kunci jawaban
+      description: Hanya bisa sekali. Sudah pernah → 409 `PLACEMENT_ALREADY_TAKEN`, kecuali `?retake=true` (menu Profil › Ulangi tes awal).
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: retake, in: query, schema: { type: boolean } }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { masteryScore: { type: integer, example: 80 }, totalQuestions: { type: integer }, questions: { type: array, items: { $ref: '#/components/schemas/TestQuestion' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /placement/submit:
+    post:
+      tags: [Placement]
+      summary: Kirim jawaban tes awal — era dengan skor ≥ 80 dikuasai, semua babnya dilewati
+      description: Penilaian memakai soal yang diterbitkan di sesi (soal tak dijawab dihitung salah). Era tanpa soal tidak dinilai. Mengembalikan era mulai yang direkomendasikan (`startEra`, null jika semua dikuasai).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/AnswerList' }, { type: object, properties: { retake: { type: boolean } } }] } } }
+      responses:
+        '200': { description: "{ masteryScore, totalQuestions, correctCount, eras[{eraId,title,score,correct,total,mastered}], masteredEras[], skippedChapters, startEra, allMastered }" }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /eras/{id}/test-out:
+    get:
+      tags: [Placement]
+      summary: Kuis gabungan satu era untuk tes lompat (boleh kapan saja, termasuk era terkunci)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: 'OK — ±2 soal acak per bab, tanpa kunci', content: { application/json: { schema: { type: object, properties: { eraId: { type: integer }, eraTitle: { type: string }, masteryScore: { type: integer }, totalQuestions: { type: integer }, questions: { type: array, items: { $ref: '#/components/schemas/StudentQuestion' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Era sudah selesai (ERA_ALREADY_DONE), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    post:
+      tags: [Placement]
+      summary: Kirim jawaban tes lompat — skor ≥ 80 membuka era & melewati semua babnya
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AnswerList' } } } }
+      responses:
+        '200': { description: "{ score, passed, masteryScore, correctCount, totalQuestions, skippedChapters, unlockedEras[], results[] }" }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /items/{id}:
+    get:
+      tags: [Learning]
+      summary: Detail peristiwa/tokoh + ringkasan Wikipedia
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: 'OK — HistoricalItem + daftar chapters + wikiSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/chapters/{id}/generate-quiz:
+    post:
+      tags: [Admin]
+      summary: Buat soal pilihan ganda dengan Gemini (disimpan sebagai DRAF)
+      description: |
+        Mengirim judul + ringkasan bab ke Gemini, meminta N soal (4 opsi, 1 jawaban benar, pembahasan) dalam JSON terstruktur,
+        lalu memvalidasi skema, jumlah opsi, indeks jawaban, dan duplikat sebelum disimpan dengan `source=ai`, `status=draft`.
+        Draf belum muncul di kuis sampai disetujui lewat `/admin/questions/{id}/approve`.
+        Error: `AI_NOT_CONFIGURED` 503, `AI_QUOTA_EXCEEDED` 429, `AI_TIMEOUT` 504, `AI_UNREACHABLE` / `AI_AUTH_FAILED` / `AI_UPSTREAM_ERROR` / `AI_INVALID_RESPONSE` 502.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { count: { type: integer, minimum: 1, maximum: 10, default: 5 } } } } } }
+      responses:
+        '201': { description: "{ chapterId, requested, created[FullQuestion], rejected[{index,reason}] }" }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: Kuota Gemini habis }
+        '502': { description: Gemini gagal / keluaran tidak valid }
+        '503': { description: GEMINI_API_KEY belum diisi }
+        '504': { description: Timeout }
+  /admin/questions/{id}/approve:
+    post:
+      tags: [Admin]
+      summary: Setujui soal draf agar dipakai di kuis
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FullQuestion' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/chapters/{id}/wiki-draft:
+    post:
+      tags: [Admin]
+      summary: Draf ringkasan bab dari Wikipedia (tidak disimpan otomatis)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { wikiTitle: { type: string, description: Bila kosong memakai wikiTitle bab } } } } } }
+      responses:
+        '200': { description: "{ chapterId, wikiTitle, draftSummary, sourceUrl, source, note }" }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { description: Artikel tidak ditemukan / Wikipedia tidak bisa diakses (WIKI_UNAVAILABLE) }
   /admin/api-keys:
     get:
       tags: [Admin]

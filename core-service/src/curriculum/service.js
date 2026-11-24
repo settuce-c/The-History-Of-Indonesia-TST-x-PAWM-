@@ -23,10 +23,11 @@ const toChapter = (r) =>
     videoUrl: r.video_url,
     summary: r.summary,
     topicTags: r.topic_tags ? r.topic_tags.split(',').filter(Boolean) : [],
+    wikiTitle: r.wiki_title ?? null,
   };
 
 const ERA_COLUMNS = { slug: 'slug', title: 'title', description: 'description', startYear: 'start_year', endYear: 'end_year', order: 'order_index' };
-const CHAPTER_COLUMNS = { eraId: 'era_id', slug: 'slug', title: 'title', order: 'order_index', videoUrl: 'video_url', summary: 'summary', topicTags: 'topic_tags' };
+const CHAPTER_COLUMNS = { eraId: 'era_id', slug: 'slug', title: 'title', order: 'order_index', videoUrl: 'video_url', summary: 'summary', topicTags: 'topic_tags', wikiTitle: 'wiki_title' };
 
 function toColumns(data, mapping) {
   const cols = [];

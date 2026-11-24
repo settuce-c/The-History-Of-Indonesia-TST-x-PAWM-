@@ -29,7 +29,9 @@ const createQuestionSchema = z
   });
 const updateQuestionSchema = nonEmpty(z.object(questionFields).partial().strict());
 
-function assessmentRoutes({ curriculum, progress, assessment }, mw, db) {
+const generateSchema = z.object({ count: z.number().int().min(1).max(10).default(5) }).strict();
+
+function assessmentRoutes({ curriculum, progress, assessment, aiQuiz }, mw, db) {
   const r = express.Router();
   const admin = [mw.auth, mw.admin];
 
@@ -83,6 +85,15 @@ function assessmentRoutes({ curriculum, progress, assessment }, mw, db) {
   r.post('/admin/chapters/:id/questions', admin, validate(idParam, 'params'), validate(createQuestionSchema), (req, res) => {
     const chapter = curriculum.requireChapter(req.valid.params.id);
     res.status(201).json(assessment.createQuestion(chapter.id, req.valid.body));
+  });
+  // POST /api/admin/chapters/:id/generate-quiz -> minta N soal ke Gemini, simpan sebagai DRAF (belum dipakai pengguna)
+  r.post('/admin/chapters/:id/generate-quiz', admin, validate(idParam, 'params'), validate(generateSchema), async (req, res) => {
+    const chapter = curriculum.requireChapter(req.valid.params.id);
+    res.status(201).json(await aiQuiz.generate(chapter, req.valid.body.count));
+  });
+  // POST /api/admin/questions/:id/approve -> soal draf baru masuk ke kuis setelah disetujui admin
+  r.post('/admin/questions/:id/approve', admin, validate(idParam, 'params'), (req, res) => {
+    res.json(assessment.approveQuestion(req.valid.params.id));
   });
   r.put('/admin/questions/:id', admin, validate(idParam, 'params'), validate(updateQuestionSchema), (req, res) => {
     res.json(assessment.updateQuestion(req.valid.params.id, req.valid.body));

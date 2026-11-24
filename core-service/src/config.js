@@ -30,6 +30,24 @@ module.exports = {
   rules: {
     passingScore: 70, // aturan 2: lulus kuis jika skor >= 70
     badgeAverage: 90, // aturan 5: lencana era jika rata-rata >= 90
+    skipScore: 80, // tes awal / tes lompat: skor era >= 80 berarti era dikuasai -> bab dilewati
+    placementQuestionsPerEra: 2, // tes awal: jumlah soal acak per era
+    testOutQuestionsPerChapter: 2, // tes lompat: jumlah soal acak per bab (digabung satu era)
+  },
+  // Kunci API AI hanya dibaca dari environment (.env), TIDAK pernah di-commit.
+  // Model AI TIDAK berjalan di STB; backend hanya memanggil API Gemini lewat internet.
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS) || 25000,
+  },
+  wikipedia: {
+    baseUrl: process.env.WIKI_API_URL || 'https://id.wikipedia.org/api/rest_v1/page/summary',
+    // Kebijakan Wikimedia: User-Agent harus jelas mengidentifikasi aplikasi + cara menghubungi.
+    userAgent:
+      process.env.WIKI_USER_AGENT || 'TheHistoryOfIndonesia/1.0 (https://thehistoryofid.stei.site; aplikasi edukasi sejarah)',
+    timeoutMs: Number(process.env.WIKI_TIMEOUT_MS) || 4000,
+    cacheDays: Number(process.env.WIKI_CACHE_DAYS) || 7,
   },
   seed: {
     admin: {
@@ -41,7 +59,7 @@ module.exports = {
     student: {
       email: process.env.SEED_STUDENT_EMAIL || 'siswa@thehistoryofid.test',
       password: process.env.SEED_STUDENT_PASSWORD,
-      name: 'Siswa Uji',
+      name: 'Pengguna Uji',
       role: 'student',
     },
     apiKeys: [

@@ -38,7 +38,7 @@ describe('Curriculum, Assessment & Learning Progress (aturan bisnis)', () => {
   test('detail bab berisi video, ringkasan, peristiwa & tokoh', async () => {
     const token = await ctx.newStudent();
     const res = await ctx.api().get(`/api/chapters/${era1Chapters[0]}`).set(auth(token)).expect(200);
-    expect(res.body).toMatchObject({ status: 'not_started', watched: false, quiz: { questionCount: 5, passingScore: 70 } });
+    expect(res.body).toMatchObject({ status: 'available', watched: false, quiz: { questionCount: 5, passingScore: 70 } });
     expect(res.body.videoUrl).toMatch(/youtube\.com|youtu\.be/);
     expect(res.body.summary.length).toBeGreaterThan(50);
     expect(res.body.events.length).toBeGreaterThan(0);

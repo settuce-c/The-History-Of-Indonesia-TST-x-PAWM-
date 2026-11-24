@@ -6,9 +6,12 @@ function presentEraState(s) {
     ...s.era,
     status: s.status,
     chapterCount: s.chapters.length,
-    completedChapters: s.completedChapters,
+    completedChapters: s.completedChapters, // termasuk bab yang dilewati
+    skippedChapters: s.skippedChapters,
     averageScore: s.averageScore,
     badgeEarned: Boolean(s.badge),
+    // Hanya ada pada era terkunci: alasan + apakah tombol "Tes lompat" bisa dipakai.
+    lock: s.lock,
   };
 }
 
@@ -21,7 +24,7 @@ function presentChapterState(c) {
     slug: chapter.slug,
     title: chapter.title,
     order: chapter.order,
-    status: c.status,
+    status: c.status, // locked | available | in_progress | completed | skipped
     watched: c.watched,
     passed: c.passed,
     bestScore: c.bestScore,

@@ -1,8 +1,9 @@
 'use strict';
 const express = require('express');
 const config = require('../config');
-const { z, id, idParam, youtubeUrl, slug, nonEmpty } = require('../shared/schemas');
+const { z, id, idParam, youtubeUrl, slug, wikiTitle, nonEmpty } = require('../shared/schemas');
 const { validate } = require('../shared/middleware');
+const { AppError, errors } = require('../shared/errors');
 const { presentEraState, presentChapterState } = require('./presenters');
 
 const year = z.number().int().min(-5000).max(2100);
@@ -25,11 +26,14 @@ const chapterFields = {
   videoUrl: youtubeUrl,
   summary: z.string().trim().min(10).max(10000),
   topicTags: z.array(z.string().trim().min(1).max(40).regex(/^[^,]+$/, 'Tag tidak boleh mengandung koma')).max(20).optional(),
+  wikiTitle: wikiTitle.nullable().optional(), // judul artikel id.wikipedia.org
 };
 const createChapterSchema = z.object(chapterFields).strict();
 const updateChapterSchema = nonEmpty(z.object(chapterFields).partial().strict());
 
-function curriculumRoutes({ curriculum, progress, knowledge, assessment }, mw) {
+const wikiDraftSchema = z.object({ wikiTitle: wikiTitle.optional() }).strict();
+
+function curriculumRoutes({ curriculum, progress, knowledge, assessment, wiki }, mw) {
   const r = express.Router();
   const admin = [mw.auth, mw.admin];
 
@@ -47,11 +51,13 @@ function curriculumRoutes({ curriculum, progress, knowledge, assessment }, mw) {
   });
 
   // GET /api/chapters/:id -> video, ringkasan, peristiwa & tokoh terkait
-  r.get('/chapters/:id', mw.auth, validate(idParam, 'params'), (req, res) => {
+  r.get('/chapters/:id', mw.auth, validate(idParam, 'params'), async (req, res) => {
     const chapter = curriculum.requireChapter(req.valid.params.id);
     const eraState = progress.assertChapterAccessible(req.user.id, chapter);
     const state = eraState.chapters.find((c) => c.chapter.id === chapter.id);
     const [next] = curriculum.nextChapters(chapter.id, 1);
+    // Materi tambahan dari Wikipedia. Jika Wikipedia gagal, hasilnya null dan materi tetap tampil.
+    const wikiSummary = await wiki.getSummary(chapter.wikiTitle);
     res.json({
       ...chapter,
       era: { id: eraState.era.id, title: eraState.era.title },
@@ -62,7 +68,27 @@ function curriculumRoutes({ curriculum, progress, knowledge, assessment }, mw) {
       attempts: assessment.attemptCount(req.user.id, chapter.id),
       quiz: { questionCount: assessment.countQuestions(chapter.id), passingScore: config.rules.passingScore },
       ...knowledge.forChapter(chapter.id),
+      wikiSummary,
       nextChapter: next ? { id: next.id, title: next.title, eraId: next.eraId } : null,
+    });
+  });
+
+  // POST /api/admin/chapters/:id/wiki-draft -> DRAF ringkasan dari Wikipedia (tidak disimpan otomatis)
+  r.post('/admin/chapters/:id/wiki-draft', admin, validate(idParam, 'params'), validate(wikiDraftSchema), async (req, res) => {
+    const chapter = curriculum.requireChapter(req.valid.params.id);
+    const title = req.valid.body.wikiTitle ?? chapter.wikiTitle;
+    if (!title) {
+      throw errors.badRequest('Isi wikiTitle di body atau set wikiTitle pada bab terlebih dahulu', 'WIKI_TITLE_REQUIRED');
+    }
+    const summary = await wiki.getSummary(title, { force: true });
+    if (!summary) throw new AppError(502, 'WIKI_UNAVAILABLE', `Artikel Wikipedia "${title}" tidak ditemukan atau Wikipedia sedang tidak bisa diakses.`);
+    res.json({
+      chapterId: chapter.id,
+      wikiTitle: title,
+      draftSummary: summary.extract,
+      sourceUrl: summary.url,
+      source: summary.source,
+      note: 'Ini hanya draf. Periksa dan sunting, lalu simpan lewat PUT /api/admin/chapters/{id}.',
     });
   });
 

@@ -15,7 +15,7 @@ const toUser = (r) =>
     id: r.id,
     email: r.email,
     name: r.name,
-    avatarUrl: r.avatar_url,
+    avatarId: r.avatar_id,
     role: r.role,
     createdAt: r.created_at,
   };
@@ -87,16 +87,16 @@ function createIdentityService(db) {
     }
   }
 
-  function updateProfile(userId, { name, avatarUrl }) {
+  function updateProfile(userId, { name, avatarId }) {
     const sets = [];
     const values = [];
     if (name !== undefined) {
       sets.push('name = ?');
       values.push(name);
     }
-    if (avatarUrl !== undefined) {
-      sets.push('avatar_url = ?');
-      values.push(avatarUrl);
+    if (avatarId !== undefined) {
+      sets.push('avatar_id = ?');
+      values.push(avatarId);
     }
     if (sets.length) db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values, userId);
     return findUser(userId);

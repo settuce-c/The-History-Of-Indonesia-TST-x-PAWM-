@@ -6,6 +6,7 @@
  *   (lewat endpoint admin PUT /api/admin/chapters/:id atau edit file ini lalu `npm run seed:reset`).
  * - Tahun untuk masa awal (Kutai, Tarumanegara) bersifat perkiraan ("sekitar abad ke-5").
  * - Koordinat adalah perkiraan lokasi situs/kota, cukup untuk penanda peta.
+ * - wikiTitle = judul artikel id.wikipedia.org (sudah diperiksa ada) untuk bagian "Baca lebih lanjut".
  * - answer = indeks (mulai 0) pilihan yang benar.
  */
 
@@ -14,69 +15,69 @@ const todoVideo = (slug) => `https://www.youtube.com/watch?v=TODO-${slug}`;
 // ---------------- Historical Knowledge: peristiwa & tokoh ----------------
 const items = {
   // --- Kutai & Tarumanegara ---
-  yupa: { kind: 'event', name: 'Penulisan Prasasti Yupa', year: 400, location: 'Muara Kaman, Kutai Kartanegara', region: 'Kalimantan Timur', lat: -0.18, lng: 116.72, description: 'Tujuh tiang batu bertulisan huruf Pallawa berbahasa Sanskerta, bukti tertulis tertua kerajaan Hindu di Indonesia (sekitar abad ke-4/5 M).' },
-  mulawarman: { kind: 'figure', name: 'Mulawarman', year: 400, location: 'Muara Kaman, Kutai Kartanegara', region: 'Kalimantan Timur', lat: -0.18, lng: 116.72, description: 'Raja Kutai paling terkenal, cucu Kudungga dan putra Aswawarman. Menurut Prasasti Yupa ia menyedekahkan 20.000 ekor sapi kepada kaum brahmana.' },
-  purnawarman: { kind: 'figure', name: 'Purnawarman', year: 450, location: 'Bogor', region: 'Jawa Barat', lat: -6.55, lng: 106.69, description: 'Raja Tarumanegara paling terkenal (sekitar abad ke-5). Dalam prasastinya ia digambarkan sebagai titisan Dewa Wisnu.' },
-  ciaruteun: { kind: 'event', name: 'Prasasti Ciaruteun', year: 450, location: 'Ciaruteun Ilir, Cibungbulang, Bogor', region: 'Jawa Barat', lat: -6.55, lng: 106.69, description: 'Prasasti Tarumanegara dengan pahatan sepasang telapak kaki Purnawarman yang diibaratkan telapak kaki Dewa Wisnu.' },
-  tugu: { kind: 'event', name: 'Prasasti Tugu', year: 450, location: 'Tugu, Koja, Jakarta Utara', region: 'DKI Jakarta', lat: -6.13, lng: 106.92, description: 'Prasasti terpanjang Tarumanegara; mencatat penggalian Sungai Candrabhaga dan Sungai Gomati sepanjang 6.122 tombak untuk irigasi dan pencegahan banjir.' },
+  yupa: { kind: 'event', wikiTitle: 'Prasasti Yupa', name: 'Penulisan Prasasti Yupa', year: 400, location: 'Muara Kaman, Kutai Kartanegara', region: 'Kalimantan Timur', lat: -0.18, lng: 116.72, description: 'Tujuh tiang batu bertulisan huruf Pallawa berbahasa Sanskerta, bukti tertulis tertua kerajaan Hindu di Indonesia (sekitar abad ke-4/5 M).' },
+  mulawarman: { kind: 'figure', wikiTitle: 'Mulawarman', name: 'Mulawarman', year: 400, location: 'Muara Kaman, Kutai Kartanegara', region: 'Kalimantan Timur', lat: -0.18, lng: 116.72, description: 'Raja Kutai paling terkenal, cucu Kudungga dan putra Aswawarman. Menurut Prasasti Yupa ia menyedekahkan 20.000 ekor sapi kepada kaum brahmana.' },
+  purnawarman: { kind: 'figure', wikiTitle: 'Purnawarman', name: 'Purnawarman', year: 450, location: 'Bogor', region: 'Jawa Barat', lat: -6.55, lng: 106.69, description: 'Raja Tarumanegara paling terkenal (sekitar abad ke-5). Dalam prasastinya ia digambarkan sebagai titisan Dewa Wisnu.' },
+  ciaruteun: { kind: 'event', wikiTitle: 'Prasasti Ciaruteun', name: 'Prasasti Ciaruteun', year: 450, location: 'Ciaruteun Ilir, Cibungbulang, Bogor', region: 'Jawa Barat', lat: -6.55, lng: 106.69, description: 'Prasasti Tarumanegara dengan pahatan sepasang telapak kaki Purnawarman yang diibaratkan telapak kaki Dewa Wisnu.' },
+  tugu: { kind: 'event', wikiTitle: 'Prasasti Tugu', name: 'Prasasti Tugu', year: 450, location: 'Tugu, Koja, Jakarta Utara', region: 'DKI Jakarta', lat: -6.13, lng: 106.92, description: 'Prasasti terpanjang Tarumanegara; mencatat penggalian Sungai Candrabhaga dan Sungai Gomati sepanjang 6.122 tombak untuk irigasi dan pencegahan banjir.' },
 
   // --- Sriwijaya ---
-  kedukanBukit: { kind: 'event', name: 'Prasasti Kedukan Bukit', year: 682, location: 'Kedukan Bukit, Palembang', region: 'Sumatera Selatan', lat: -2.99, lng: 104.73, description: 'Prasasti tertua Sriwijaya (605 Saka/682 M) berbahasa Melayu Kuno; menceritakan perjalanan suci (siddhayatra) Dapunta Hyang.' },
+  kedukanBukit: { kind: 'event', wikiTitle: 'Prasasti Kedukan Bukit', name: 'Prasasti Kedukan Bukit', year: 682, location: 'Kedukan Bukit, Palembang', region: 'Sumatera Selatan', lat: -2.99, lng: 104.73, description: 'Prasasti tertua Sriwijaya (605 Saka/682 M) berbahasa Melayu Kuno; menceritakan perjalanan suci (siddhayatra) Dapunta Hyang.' },
   jayanasa: { kind: 'figure', name: 'Dapunta Hyang Sri Jayanasa', year: 682, location: 'Palembang', region: 'Sumatera Selatan', lat: -2.98, lng: 104.76, description: 'Pendiri Kerajaan Sriwijaya menurut Prasasti Kedukan Bukit.' },
-  itsing: { kind: 'event', name: 'Kunjungan I-Tsing ke Sriwijaya', year: 671, location: 'Palembang', region: 'Sumatera Selatan', lat: -2.98, lng: 104.76, description: 'Biksu Tiongkok I-Tsing singgah dan belajar tata bahasa Sanskerta di Sriwijaya dalam perjalanan ke India; ia mencatat Sriwijaya sebagai pusat pembelajaran agama Buddha.' },
-  balaputradewa: { kind: 'figure', name: 'Balaputradewa', year: 860, location: 'Palembang', region: 'Sumatera Selatan', lat: -2.98, lng: 104.76, description: 'Raja Sriwijaya abad ke-9 dari wangsa Syailendra; disebut dalam Prasasti Nalanda karena membangun asrama bagi pelajar Sriwijaya di Nalanda, India.' },
+  itsing: { kind: 'event', wikiTitle: 'Yijing (biksu)', name: 'Kunjungan I-Tsing ke Sriwijaya', year: 671, location: 'Palembang', region: 'Sumatera Selatan', lat: -2.98, lng: 104.76, description: 'Biksu Tiongkok I-Tsing singgah dan belajar tata bahasa Sanskerta di Sriwijaya dalam perjalanan ke India; ia mencatat Sriwijaya sebagai pusat pembelajaran agama Buddha.' },
+  balaputradewa: { kind: 'figure', wikiTitle: 'Balaputradewa', name: 'Balaputradewa', year: 860, location: 'Palembang', region: 'Sumatera Selatan', lat: -2.98, lng: 104.76, description: 'Raja Sriwijaya abad ke-9 dari wangsa Syailendra; disebut dalam Prasasti Nalanda karena membangun asrama bagi pelajar Sriwijaya di Nalanda, India.' },
   chola: { kind: 'event', name: 'Serangan Kerajaan Chola ke Sriwijaya', year: 1025, location: 'Selat Malaka', region: 'Sumatra dan Semenanjung Malaya', lat: 2.5, lng: 101.5, description: 'Raja Rajendra Chola I dari India Selatan menyerang pusat-pusat Sriwijaya; serangan ini melemahkan dominasi maritim Sriwijaya.' },
 
   // --- Majapahit ---
   majapahit: { kind: 'event', name: 'Berdirinya Kerajaan Majapahit', year: 1293, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Raden Wijaya memanfaatkan pasukan Mongol untuk mengalahkan Jayakatwang dari Kediri, lalu mengusir pasukan Mongol dan mendirikan Majapahit.' },
-  raden_wijaya: { kind: 'figure', name: 'Raden Wijaya', year: 1293, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Pendiri dan raja pertama Majapahit, bergelar Kertarajasa Jayawardhana.' },
-  palapa: { kind: 'event', name: 'Sumpah Palapa', year: 1336, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Sumpah Gajah Mada saat diangkat menjadi mahapatih: ia tidak akan menikmati palapa sebelum menyatukan Nusantara.' },
-  gajah_mada: { kind: 'figure', name: 'Gajah Mada', year: 1336, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Mahapatih Majapahit yang terkenal dengan Sumpah Palapa dan perannya memperluas pengaruh Majapahit.' },
-  hayam_wuruk: { kind: 'figure', name: 'Hayam Wuruk', year: 1350, yearEnd: 1389, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Raja Majapahit (bergelar Rajasanagara) yang memerintah pada masa puncak kejayaan kerajaan.' },
-  negarakertagama: { kind: 'event', name: 'Penulisan Kakawin Negarakertagama', year: 1365, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Karya Mpu Prapanca yang menggambarkan wilayah, pemerintahan, dan kehidupan Majapahit pada masa Hayam Wuruk.' },
+  raden_wijaya: { kind: 'figure', wikiTitle: 'Raden Wijaya', name: 'Raden Wijaya', year: 1293, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Pendiri dan raja pertama Majapahit, bergelar Kertarajasa Jayawardhana.' },
+  palapa: { kind: 'event', wikiTitle: 'Sumpah Palapa', name: 'Sumpah Palapa', year: 1336, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Sumpah Gajah Mada saat diangkat menjadi mahapatih: ia tidak akan menikmati palapa sebelum menyatukan Nusantara.' },
+  gajah_mada: { kind: 'figure', wikiTitle: 'Gajah Mada', name: 'Gajah Mada', year: 1336, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Mahapatih Majapahit yang terkenal dengan Sumpah Palapa dan perannya memperluas pengaruh Majapahit.' },
+  hayam_wuruk: { kind: 'figure', wikiTitle: 'Hayam Wuruk', name: 'Hayam Wuruk', year: 1350, yearEnd: 1389, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Raja Majapahit (bergelar Rajasanagara) yang memerintah pada masa puncak kejayaan kerajaan.' },
+  negarakertagama: { kind: 'event', wikiTitle: 'Kakawin Nagarakretagama', name: 'Penulisan Kakawin Negarakertagama', year: 1365, location: 'Trowulan, Mojokerto', region: 'Jawa Timur', lat: -7.56, lng: 112.38, description: 'Karya Mpu Prapanca yang menggambarkan wilayah, pemerintahan, dan kehidupan Majapahit pada masa Hayam Wuruk.' },
 
   // --- Samudra Pasai ---
   malik_saleh: { kind: 'figure', name: 'Sultan Malik as-Saleh', year: 1297, location: 'Samudera, Aceh Utara', region: 'Aceh', lat: 5.16, lng: 97.27, description: 'Pendiri dan sultan pertama Samudra Pasai (nama asli Meurah Silu). Nisan makamnya bertarikh 696 H/1297 M.' },
   nisan_malik: { kind: 'event', name: 'Nisan Makam Sultan Malik as-Saleh', year: 1297, location: 'Samudera, Aceh Utara', region: 'Aceh', lat: 5.16, lng: 97.27, description: 'Nisan bertarikh 1297 M yang menjadi salah satu bukti tertua kerajaan Islam di Nusantara.' },
-  ibnu_battuta: { kind: 'event', name: 'Kunjungan Ibnu Battuta ke Samudra Pasai', year: 1345, location: 'Samudera, Aceh Utara', region: 'Aceh', lat: 5.16, lng: 97.27, description: 'Penjelajah asal Maroko, Ibnu Battuta, singgah di Samudra Pasai dan mencatat sultannya sebagai penganut mazhab Syafi\'i yang taat.' },
+  ibnu_battuta: { kind: 'event', wikiTitle: 'Ibnu Batutah', name: 'Kunjungan Ibnu Battuta ke Samudra Pasai', year: 1345, location: 'Samudera, Aceh Utara', region: 'Aceh', lat: 5.16, lng: 97.27, description: 'Penjelajah asal Maroko, Ibnu Battuta, singgah di Samudra Pasai dan mencatat sultannya sebagai penganut mazhab Syafi\'i yang taat.' },
 
   // --- Demak ---
   demak: { kind: 'event', name: 'Berdirinya Kesultanan Demak', year: 1478, location: 'Demak', region: 'Jawa Tengah', lat: -6.89, lng: 110.64, description: 'Kerajaan Islam pertama di Pulau Jawa, didirikan Raden Patah seiring melemahnya Majapahit.' },
-  raden_patah: { kind: 'figure', name: 'Raden Patah', year: 1478, location: 'Demak', region: 'Jawa Tengah', lat: -6.89, lng: 110.64, description: 'Pendiri dan sultan pertama Kesultanan Demak.' },
-  masjid_demak: { kind: 'event', name: 'Pembangunan Masjid Agung Demak', year: 1479, location: 'Demak', region: 'Jawa Tengah', lat: -6.89, lng: 110.64, description: 'Masjid yang menurut tradisi dibangun oleh Wali Songo; salah satu tiang utamanya (saka tatal) dikaitkan dengan Sunan Kalijaga.' },
-  pati_unus: { kind: 'event', name: 'Serangan Pati Unus ke Malaka', year: 1513, location: 'Malaka', region: 'Semenanjung Malaya', lat: 2.19, lng: 102.25, description: 'Pati Unus memimpin armada Demak menyerang Portugis di Malaka sehingga dijuluki Pangeran Sabrang Lor.' },
+  raden_patah: { kind: 'figure', wikiTitle: 'Raden Patah', name: 'Raden Patah', year: 1478, location: 'Demak', region: 'Jawa Tengah', lat: -6.89, lng: 110.64, description: 'Pendiri dan sultan pertama Kesultanan Demak.' },
+  masjid_demak: { kind: 'event', wikiTitle: 'Masjid Agung Demak', name: 'Pembangunan Masjid Agung Demak', year: 1479, location: 'Demak', region: 'Jawa Tengah', lat: -6.89, lng: 110.64, description: 'Masjid yang menurut tradisi dibangun oleh Wali Songo; salah satu tiang utamanya (saka tatal) dikaitkan dengan Sunan Kalijaga.' },
+  pati_unus: { kind: 'event', wikiTitle: 'Pati Unus', name: 'Serangan Pati Unus ke Malaka', year: 1513, location: 'Malaka', region: 'Semenanjung Malaya', lat: 2.19, lng: 102.25, description: 'Pati Unus memimpin armada Demak menyerang Portugis di Malaka sehingga dijuluki Pangeran Sabrang Lor.' },
   sunda_kelapa: { kind: 'event', name: 'Penaklukan Sunda Kelapa', year: 1527, location: 'Sunda Kelapa, Jakarta Utara', region: 'DKI Jakarta', lat: -6.12, lng: 106.81, description: 'Fatahillah merebut Sunda Kelapa dari pengaruh Portugis pada 22 Juni 1527 dan menamainya Jayakarta.' },
-  fatahillah: { kind: 'figure', name: 'Fatahillah', year: 1527, location: 'Sunda Kelapa, Jakarta Utara', region: 'DKI Jakarta', lat: -6.12, lng: 106.81, description: 'Panglima Demak yang menaklukkan Sunda Kelapa dan mengganti namanya menjadi Jayakarta.' },
+  fatahillah: { kind: 'figure', wikiTitle: 'Fatahillah', name: 'Fatahillah', year: 1527, location: 'Sunda Kelapa, Jakarta Utara', region: 'DKI Jakarta', lat: -6.12, lng: 106.81, description: 'Panglima Demak yang menaklukkan Sunda Kelapa dan mengganti namanya menjadi Jayakarta.' },
 
   // --- Mataram Islam ---
   mataram: { kind: 'event', name: 'Berdirinya Kesultanan Mataram', year: 1586, location: 'Kotagede, Yogyakarta', region: 'DI Yogyakarta', lat: -7.83, lng: 110.4, description: 'Sutawijaya (Panembahan Senopati) membangun Mataram di Kotagede, bekas Alas Mentaok yang diberikan kepada ayahnya, Ki Ageng Pemanahan.' },
-  senopati: { kind: 'figure', name: 'Panembahan Senopati', year: 1586, location: 'Kotagede, Yogyakarta', region: 'DI Yogyakarta', lat: -7.83, lng: 110.4, description: 'Nama asli Sutawijaya; pendiri Kesultanan Mataram Islam.' },
-  sultan_agung: { kind: 'figure', name: 'Sultan Agung', year: 1613, yearEnd: 1645, location: 'Kerta, Bantul', region: 'DI Yogyakarta', lat: -7.86, lng: 110.4, description: 'Raja Mataram pada masa kejayaan; menyerang VOC di Batavia dan memperkenalkan kalender Jawa.' },
+  senopati: { kind: 'figure', wikiTitle: 'Senapati dari Mataram', name: 'Panembahan Senopati', year: 1586, location: 'Kotagede, Yogyakarta', region: 'DI Yogyakarta', lat: -7.83, lng: 110.4, description: 'Nama asli Sutawijaya; pendiri Kesultanan Mataram Islam.' },
+  sultan_agung: { kind: 'figure', wikiTitle: 'Sultan Agung dari Mataram', name: 'Sultan Agung', year: 1613, yearEnd: 1645, location: 'Kerta, Bantul', region: 'DI Yogyakarta', lat: -7.86, lng: 110.4, description: 'Raja Mataram pada masa kejayaan; menyerang VOC di Batavia dan memperkenalkan kalender Jawa.' },
   serangan_batavia: { kind: 'event', name: 'Serangan Mataram ke Batavia', year: 1628, yearEnd: 1629, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Dua kali serangan pasukan Sultan Agung ke Batavia (1628 dan 1629) yang gagal, antara lain karena lumbung padi pasukan Mataram dihancurkan VOC.' },
-  giyanti: { kind: 'event', name: 'Perjanjian Giyanti', year: 1755, location: 'Giyanti, Karanganyar', region: 'Jawa Tengah', lat: -7.59, lng: 110.95, description: 'Perjanjian 13 Februari 1755 yang membagi Mataram menjadi Kasunanan Surakarta dan Kesultanan Yogyakarta.' },
+  giyanti: { kind: 'event', wikiTitle: 'Perjanjian Giyanti', name: 'Perjanjian Giyanti', year: 1755, location: 'Giyanti, Karanganyar', region: 'Jawa Tengah', lat: -7.59, lng: 110.95, description: 'Perjanjian 13 Februari 1755 yang membagi Mataram menjadi Kasunanan Surakarta dan Kesultanan Yogyakarta.' },
 
   // --- VOC ---
   houtman: { kind: 'event', name: 'Kedatangan Cornelis de Houtman di Banten', year: 1596, location: 'Banten Lama, Serang', region: 'Banten', lat: -6.04, lng: 106.15, description: 'Ekspedisi Belanda pertama yang tiba di Nusantara untuk mencari rempah-rempah.' },
   voc: { kind: 'event', name: 'Pendirian VOC', year: 1602, location: 'Amsterdam', region: 'Belanda', lat: 52.37, lng: 4.9, description: 'Vereenigde Oostindische Compagnie didirikan pada 20 Maret 1602 sebagai gabungan perusahaan dagang Belanda dan diberi hak oktroi.' },
-  coen: { kind: 'figure', name: 'Jan Pieterszoon Coen', year: 1619, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Gubernur Jenderal VOC yang merebut Jayakarta dan mendirikan Batavia.' },
-  batavia: { kind: 'event', name: 'Pendirian Batavia', year: 1619, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'VOC merebut Jayakarta dan menjadikannya Batavia, pusat kekuasaan VOC di Asia.' },
+  coen: { kind: 'figure', wikiTitle: 'Jan Pieterszoon Coen', name: 'Jan Pieterszoon Coen', year: 1619, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Gubernur Jenderal VOC yang merebut Jayakarta dan mendirikan Batavia.' },
+  batavia: { kind: 'event', wikiTitle: 'Batavia', name: 'Pendirian Batavia', year: 1619, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'VOC merebut Jayakarta dan menjadikannya Batavia, pusat kekuasaan VOC di Asia.' },
   voc_bubar: { kind: 'event', name: 'Pembubaran VOC', year: 1799, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'VOC dibubarkan pada 31 Desember 1799 akibat korupsi, utang besar, dan biaya perang; wilayahnya diambil alih pemerintah Belanda.' },
 
   // --- Tanam Paksa ---
-  van_den_bosch: { kind: 'figure', name: 'Johannes van den Bosch', year: 1830, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Gubernur Jenderal Hindia Belanda yang memberlakukan Cultuurstelsel (Tanam Paksa) mulai 1830.' },
+  van_den_bosch: { kind: 'figure', wikiTitle: 'Johannes van den Bosch', name: 'Johannes van den Bosch', year: 1830, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Gubernur Jenderal Hindia Belanda yang memberlakukan Cultuurstelsel (Tanam Paksa) mulai 1830.' },
   tanam_paksa: { kind: 'event', name: 'Pemberlakuan Tanam Paksa', year: 1830, yearEnd: 1870, location: 'Pulau Jawa', region: 'Jawa', lat: -7.3, lng: 110.0, description: 'Petani wajib menyisihkan sebagian tanah (seperlima) untuk tanaman ekspor seperti kopi, tebu, dan nila.' },
   grobogan: { kind: 'event', name: 'Bencana Kelaparan di Grobogan', year: 1849, yearEnd: 1850, location: 'Grobogan', region: 'Jawa Tengah', lat: -7.02, lng: 110.92, description: 'Salah satu bencana kelaparan besar akibat beban Tanam Paksa, selain di Cirebon dan Demak.' },
-  multatuli: { kind: 'figure', name: 'Eduard Douwes Dekker (Multatuli)', year: 1860, location: 'Rangkasbitung, Lebak', region: 'Banten', lat: -6.36, lng: 106.25, description: 'Mantan asisten residen Lebak yang menulis novel Max Havelaar untuk mengkritik penindasan pada masa Tanam Paksa.' },
-  max_havelaar: { kind: 'event', name: 'Terbitnya Novel Max Havelaar', year: 1860, location: 'Amsterdam', region: 'Belanda', lat: 52.37, lng: 4.9, description: 'Novel karya Multatuli yang membuka mata publik Belanda tentang penderitaan rakyat Hindia Belanda.' },
-  uu_agraria: { kind: 'event', name: 'Undang-Undang Agraria 1870', year: 1870, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Agrarische Wet membuka Hindia Belanda bagi modal swasta dan menandai berakhirnya Tanam Paksa (era ekonomi liberal).' },
+  multatuli: { kind: 'figure', wikiTitle: 'Eduard Douwes Dekker', name: 'Eduard Douwes Dekker (Multatuli)', year: 1860, location: 'Rangkasbitung, Lebak', region: 'Banten', lat: -6.36, lng: 106.25, description: 'Mantan asisten residen Lebak yang menulis novel Max Havelaar untuk mengkritik penindasan pada masa Tanam Paksa.' },
+  max_havelaar: { kind: 'event', wikiTitle: 'Max Havelaar', name: 'Terbitnya Novel Max Havelaar', year: 1860, location: 'Amsterdam', region: 'Belanda', lat: 52.37, lng: 4.9, description: 'Novel karya Multatuli yang membuka mata publik Belanda tentang penderitaan rakyat Hindia Belanda.' },
+  uu_agraria: { kind: 'event', wikiTitle: 'Undang-Undang Agraria 1870', name: 'Undang-Undang Agraria 1870', year: 1870, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Agrarische Wet membuka Hindia Belanda bagi modal swasta dan menandai berakhirnya Tanam Paksa (era ekonomi liberal).' },
 
   // --- Politik Etis & Kebangkitan Nasional ---
-  van_deventer: { kind: 'figure', name: 'Conrad Theodor van Deventer', year: 1899, location: 'Belanda', region: 'Belanda', lat: 52.37, lng: 4.9, description: 'Penulis artikel "Een Eereschuld" (Utang Kehormatan) yang mendorong lahirnya Politik Etis.' },
+  van_deventer: { kind: 'figure', wikiTitle: 'Conrad Theodor van Deventer', name: 'Conrad Theodor van Deventer', year: 1899, location: 'Belanda', region: 'Belanda', lat: 52.37, lng: 4.9, description: 'Penulis artikel "Een Eereschuld" (Utang Kehormatan) yang mendorong lahirnya Politik Etis.' },
   eereschuld: { kind: 'event', name: 'Artikel Een Eereschuld', year: 1899, location: 'Belanda', region: 'Belanda', lat: 52.37, lng: 4.9, description: 'Artikel di majalah De Gids yang menyatakan Belanda berutang budi kepada rakyat Hindia Belanda.' },
-  politik_etis: { kind: 'event', name: 'Pemberlakuan Politik Etis', year: 1901, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Kebijakan balas budi berisi tiga program: irigasi, emigrasi, dan edukasi.' },
-  budi_utomo: { kind: 'event', name: 'Berdirinya Budi Utomo', year: 1908, location: 'STOVIA, Jakarta Pusat', region: 'DKI Jakarta', lat: -6.18, lng: 106.84, description: 'Organisasi modern pertama, didirikan mahasiswa STOVIA pada 20 Mei 1908; tanggalnya diperingati sebagai Hari Kebangkitan Nasional.' },
-  sutomo: { kind: 'figure', name: 'dr. Sutomo', year: 1908, location: 'STOVIA, Jakarta Pusat', region: 'DKI Jakarta', lat: -6.18, lng: 106.84, description: 'Mahasiswa STOVIA yang bersama rekan-rekannya mendirikan Budi Utomo, terinspirasi gagasan dr. Wahidin Sudirohusodo.' },
-  sumpah_pemuda: { kind: 'event', name: 'Sumpah Pemuda', year: 1928, location: 'Jalan Kramat Raya 106, Jakarta Pusat', region: 'DKI Jakarta', lat: -6.18, lng: 106.84, description: 'Ikrar Kongres Pemuda II pada 28 Oktober 1928: satu tanah air, satu bangsa, dan menjunjung bahasa persatuan, bahasa Indonesia.' },
+  politik_etis: { kind: 'event', wikiTitle: 'Politik Etis', name: 'Pemberlakuan Politik Etis', year: 1901, location: 'Batavia (Jakarta)', region: 'DKI Jakarta', lat: -6.13, lng: 106.81, description: 'Kebijakan balas budi berisi tiga program: irigasi, emigrasi, dan edukasi.' },
+  budi_utomo: { kind: 'event', wikiTitle: 'Boedi Oetomo', name: 'Berdirinya Budi Utomo', year: 1908, location: 'STOVIA, Jakarta Pusat', region: 'DKI Jakarta', lat: -6.18, lng: 106.84, description: 'Organisasi modern pertama, didirikan mahasiswa STOVIA pada 20 Mei 1908; tanggalnya diperingati sebagai Hari Kebangkitan Nasional.' },
+  sutomo: { kind: 'figure', wikiTitle: 'Soetomo', name: 'dr. Sutomo', year: 1908, location: 'STOVIA, Jakarta Pusat', region: 'DKI Jakarta', lat: -6.18, lng: 106.84, description: 'Mahasiswa STOVIA yang bersama rekan-rekannya mendirikan Budi Utomo, terinspirasi gagasan dr. Wahidin Sudirohusodo.' },
+  sumpah_pemuda: { kind: 'event', wikiTitle: 'Sumpah Pemuda', name: 'Sumpah Pemuda', year: 1928, location: 'Jalan Kramat Raya 106, Jakarta Pusat', region: 'DKI Jakarta', lat: -6.18, lng: 106.84, description: 'Ikrar Kongres Pemuda II pada 28 Oktober 1928: satu tanah air, satu bangsa, dan menjunjung bahasa persatuan, bahasa Indonesia.' },
 };
 
 const q = (question, options, answer, explanation) => ({ question, options, answer, explanation });
@@ -92,6 +93,7 @@ const eras = [
     chapters: [
       {
         slug: 'kutai-dan-tarumanegara',
+        wikiTitle: 'Kerajaan Kutai Martapura',
         title: 'Kutai dan Tarumanegara',
         topicTags: ['kutai', 'tarumanegara', 'mulawarman', 'purnawarman', 'yupa', 'hindu'],
         summary:
@@ -108,6 +110,7 @@ const eras = [
       },
       {
         slug: 'sriwijaya',
+        wikiTitle: 'Sriwijaya',
         title: 'Sriwijaya: Kerajaan Maritim',
         topicTags: ['sriwijaya', 'palembang', 'buddha', 'maritim', 'balaputradewa'],
         summary:
@@ -124,6 +127,7 @@ const eras = [
       },
       {
         slug: 'majapahit',
+        wikiTitle: 'Majapahit',
         title: 'Majapahit',
         topicTags: ['majapahit', 'gajah mada', 'hayam wuruk', 'sumpah palapa', 'raden wijaya'],
         summary:
@@ -149,6 +153,7 @@ const eras = [
     chapters: [
       {
         slug: 'samudra-pasai',
+        wikiTitle: 'Kesultanan Samudera Pasai',
         title: 'Samudra Pasai',
         topicTags: ['samudra pasai', 'pasai', 'aceh', 'malik as-saleh', 'islam'],
         summary:
@@ -165,6 +170,7 @@ const eras = [
       },
       {
         slug: 'demak',
+        wikiTitle: 'Kesultanan Demak',
         title: 'Kesultanan Demak',
         topicTags: ['demak', 'raden patah', 'wali songo', 'pati unus', 'fatahillah', 'islam'],
         summary:
@@ -181,6 +187,7 @@ const eras = [
       },
       {
         slug: 'mataram-islam',
+        wikiTitle: 'Kesunanan Mataram',
         title: 'Mataram Islam',
         topicTags: ['mataram', 'mataram islam', 'sultan agung', 'panembahan senopati', 'giyanti'],
         summary:
@@ -206,6 +213,7 @@ const eras = [
     chapters: [
       {
         slug: 'voc',
+        wikiTitle: 'Perusahaan Hindia Timur Belanda',
         title: 'VOC dan Monopoli Rempah',
         topicTags: ['voc', 'kolonial', 'belanda', 'rempah', 'batavia', 'jp coen'],
         summary:
@@ -222,6 +230,7 @@ const eras = [
       },
       {
         slug: 'tanam-paksa',
+        wikiTitle: 'Cultuurstelsel',
         title: 'Tanam Paksa (Cultuurstelsel)',
         topicTags: ['tanam paksa', 'cultuurstelsel', 'van den bosch', 'multatuli', 'max havelaar', 'kolonial'],
         summary:
@@ -238,6 +247,7 @@ const eras = [
       },
       {
         slug: 'politik-etis-dan-kebangkitan-nasional',
+        wikiTitle: 'Politik Etis',
         title: 'Politik Etis dan Kebangkitan Nasional',
         topicTags: ['politik etis', 'budi utomo', 'kebangkitan nasional', 'sumpah pemuda', 'van deventer'],
         summary:

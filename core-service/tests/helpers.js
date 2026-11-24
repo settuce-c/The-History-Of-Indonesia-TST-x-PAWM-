@@ -11,8 +11,16 @@ const ACCOUNTS = {
 const API_KEYS = { classroom: 'test-key-classroom', tourism: 'test-key-tourism' };
 const silent = { log() {}, warn() {} };
 
-/** App baru dengan database in-memory yang sudah berisi seed. Setiap test file terisolasi. */
-function createTestContext() {
+/** Default test: tidak ada akses internet. Wikipedia/Gemini gagal dengan rapi (bukan crash). */
+const offlineFetch = async () => {
+  throw new Error('jaringan dimatikan di test');
+};
+
+/**
+ * App baru dengan database in-memory yang sudah berisi seed. Setiap test file terisolasi.
+ * opts.fetch = fetch palsu untuk Gemini/Wikipedia; opts.gemini = override konfigurasi (mis. apiKey).
+ */
+function createTestContext(opts = {}) {
   const db = openDatabase(':memory:');
   seedContent(db);
   seedAccounts(
@@ -26,7 +34,7 @@ function createTestContext() {
     },
     silent
   );
-  const app = createApp(db);
+  const app = createApp(db, { fetch: opts.fetch || offlineFetch, gemini: opts.gemini, wikipedia: opts.wikipedia, now: opts.now });
   const api = () => request(app);
 
   async function login(account) {

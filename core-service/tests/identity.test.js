@@ -64,19 +64,26 @@ describe('Identity & Access', () => {
     expect(res.body).toMatchObject({ email: ctx.ACCOUNTS.student.email, role: 'student' });
   });
 
-  test('PUT /api/me mengubah nama & avatar dengan validasi', async () => {
+  test('PUT /api/me mengubah nama & memilih avatar bawaan (bukan URL)', async () => {
     const token = await ctx.login(ctx.ACCOUNTS.student);
     const auth = { Authorization: `Bearer ${token}` };
-    const ok = await ctx
-      .api()
-      .put('/api/me')
-      .set(auth)
-      .send({ name: 'Siswa Berganti', avatarUrl: 'https://example.com/avatar.png' })
-      .expect(200);
-    expect(ok.body).toMatchObject({ name: 'Siswa Berganti', avatarUrl: 'https://example.com/avatar.png' });
+
+    const before = await ctx.api().get('/api/me').set(auth).expect(200);
+    expect(before.body.avatarId).toBeNull(); // belum memilih -> aplikasi menampilkan inisial
+    expect(before.body).not.toHaveProperty('avatarUrl');
+
+    const ok = await ctx.api().put('/api/me').set(auth).send({ name: 'Pengguna Berganti', avatarId: 'candi' }).expect(200);
+    expect(ok.body).toMatchObject({ name: 'Pengguna Berganti', avatarId: 'candi' });
+
+    // avatarId boleh dikosongkan kembali (null) -> kembali ke inisial
+    const cleared = await ctx.api().put('/api/me').set(auth).send({ avatarId: null }).expect(200);
+    expect(cleared.body.avatarId).toBeNull();
 
     await ctx.api().put('/api/me').set(auth).send({}).expect(400);
-    await ctx.api().put('/api/me').set(auth).send({ avatarUrl: 'http://tidak-aman.com/a.png' }).expect(400);
+    await ctx.api().put('/api/me').set(auth).send({ avatarId: 'tidak-ada' }).expect(400); // di luar daftar bawaan
+    // URL foto sudah tidak didukung: field avatarUrl ditolak sebagai field asing
+    const url = await ctx.api().put('/api/me').set(auth).send({ avatarUrl: 'https://example.com/a.png' }).expect(400);
+    expect(url.body.error.code).toBe('VALIDATION_ERROR');
     await ctx.api().put('/api/me').set(auth).send({ role: 'admin' }).expect(400); // field asing ditolak
   });
 

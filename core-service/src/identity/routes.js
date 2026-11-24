@@ -2,6 +2,7 @@
 const express = require('express');
 const { z, idParam, nonEmpty } = require('../shared/schemas');
 const { validate } = require('../shared/middleware');
+const { AVATAR_IDS } = require('../shared/avatars');
 
 const email = z.string().trim().toLowerCase().email('Format email tidak valid').max(254);
 const name = z.string().trim().min(2, 'Nama minimal 2 karakter').max(60, 'Nama maksimal 60 karakter');
@@ -16,14 +17,8 @@ const updateMeSchema = nonEmpty(
   z
     .object({
       name: name.optional(),
-      avatarUrl: z
-        .string()
-        .trim()
-        .url('avatarUrl harus berupa URL')
-        .max(500)
-        .refine((u) => u.startsWith('https://'), 'avatarUrl harus memakai https')
-        .nullable()
-        .optional(),
+      // Avatar dipilih dari daftar bawaan; URL foto tidak diterima lagi (field tak dikenal -> 400).
+      avatarId: z.enum(AVATAR_IDS, { errorMap: () => ({ message: `avatarId harus salah satu dari: ${AVATAR_IDS.join(', ')}` }) }).nullable().optional(),
     })
     .strict()
 );

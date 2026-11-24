@@ -1,6 +1,6 @@
 # TheHistoryOfIndonesia — Learning Path Service
 
-Backend microservice untuk aplikasi **TheHistoryOfIndonesia**, aplikasi belajar sejarah Indonesia (video YouTube + ringkasan + kuis).
+Backend microservice untuk aplikasi **TheHistoryOfIndonesia**, aplikasi belajar sejarah Indonesia (video YouTube + ringkasan + kuis) untuk **umum: siapa saja yang penasaran dengan sejarah Indonesia**, dengan gaya belajar ala Duolingo (tes awal, lewati era yang sudah dikuasai).
 Tugas Besar II3160 Teknologi Sistem Terintegrasi × II3140 Pengembangan Aplikasi Web & Mobile, ITB — kelas K02.
 
 | | |
@@ -17,12 +17,15 @@ Tugas Besar II3160 Teknologi Sistem Terintegrasi × II3140 Pengembangan Aplikasi
 **Learning Path Service** mengelola jalur belajar sejarah Indonesia: era → bab → materi (video + ringkasan) → kuis.
 Service menegakkan aturan belajar di server:
 
-1. Era ke-n terbuka hanya jika semua bab di era ke-(n−1) sudah **selesai**. Era pertama selalu terbuka.
+1. Era ke-n terbuka jika semua bab di era ke-(n−1) sudah **selesai atau dilewati (`skipped`)**. Era pertama selalu terbuka. Era juga terbuka jika pengguna lulus **tes lompat** era itu.
 2. Kuis lulus jika skor **≥ 70** (dari 100). Percobaan tidak dibatasi; yang disimpan nilai tertinggi.
 3. Kunci jawaban **tidak pernah** dikirim ke aplikasi sebelum submit; penilaian dilakukan di server.
 4. Bab selesai jika video sudah ditandai ditonton **dan** kuis lulus.
-5. Lencana era diberikan jika era tuntas dengan rata-rata nilai **≥ 90**.
+5. Lencana era diberikan jika era tuntas **lewat kuis bab** (tidak ada bab yang dilewati) dengan rata-rata nilai **≥ 90**.
 6. Akses bab/kuis di era yang masih terkunci ditolak dengan **403 `ERA_LOCKED`**.
+7. **Tes awal (placement test):** ±2 soal acak per era. Era dengan skor **≥ 80** dianggap dikuasai: semua babnya berstatus `skipped`. Hanya bisa sekali (bisa diulang dari Profil › Ulangi tes awal).
+8. **Tes lompat (test-out):** kuis gabungan satu era, boleh kapan saja. Skor **≥ 80** → era terbuka dan semua babnya dilewati.
+9. Status bab: `locked | available | in_progress | completed | skipped`. `completed` (video + kuis) menang atas `skipped` bila pengguna mengerjakan bab yang tadinya dilewati.
 
 ### Bounded context (Domain-Driven Design)
 
@@ -30,10 +33,11 @@ Service menegakkan aturan belajar di server:
 |---|---|---|
 | Curriculum | `core-service/src/curriculum` | Era, bab, video YouTube, ringkasan, urutan |
 | Historical Knowledge | `core-service/src/knowledge` | Peristiwa & tokoh (tahun, lokasi, koordinat) |
-| Assessment | `core-service/src/assessment` | Soal pilihan ganda, penilaian, riwayat percobaan |
-| Learning Progress | `core-service/src/progress` | Status tonton, kelulusan bab, pembukaan era, lencana |
+| Assessment | `core-service/src/assessment` | Soal pilihan ganda, penilaian, riwayat percobaan, draf soal AI + persetujuan admin |
+| Learning Progress | `core-service/src/progress` | Status tonton, kelulusan bab, pembukaan era, lencana, tes awal & tes lompat (`skipped`) |
 | Identity & Access | `core-service/src/identity` | Akun, JWT, role, API key kelompok lain |
 | Open Host Service | `core-service/src/public` | API publik stabil untuk kelompok lain |
+| Integrasi eksternal | `core-service/src/integrations` | Klien Gemini API & Wikipedia (diinjeksi, mudah dipalsukan di test) |
 
 **Stack:** Node.js 22 LTS, Express 5, SQLite (better-sqlite3), zod (validasi), bcrypt, JWT, Swagger UI, Jest + supertest, Nginx, Cloudflare Tunnel, Docker Compose di STB Armbian arm64.
 
@@ -68,22 +72,33 @@ Base URL: `https://thehistoryofid.stei.site/api`
 | Method | Path | Auth | Keterangan |
 |---|---|---|---|
 | GET | `/health` | – | Status service |
-| POST | `/auth/register` | – | Daftar akun siswa → `{ user, token }` |
+| POST | `/auth/register` | – | Daftar akun → `{ user, token }` |
 | POST | `/auth/login` | – | Login → `{ user, token }` |
 | GET | `/me` | JWT | Profil |
-| PUT | `/me` | JWT | Ubah `name` / `avatarUrl` (https) |
+| PUT | `/me` | JWT | Ubah `name` / pilih `avatarId` (avatar bawaan: `candi`, `keris`, `wayang`, `pinisi`, `batik`, `gunungan`, `rumah-gadang`, `garuda`; `null` = inisial). URL foto **tidak** didukung lagi |
 
 ### Belajar (aplikasi)
 
 | Method | Path | Auth | Keterangan |
 |---|---|---|---|
-| GET | `/eras` | JWT | Semua era + status `locked` / `unlocked` / `completed` |
+| GET | `/eras` | JWT | Semua era + status `locked` / `unlocked` / `completed`; era terkunci membawa `lock` (alasan + `testOutAvailable`) |
 | GET | `/eras/:id/chapters` | JWT | Bab di era + status tiap bab |
-| GET | `/chapters/:id` | JWT | Video, ringkasan, peristiwa & tokoh terkait (403 jika era terkunci) |
+| GET | `/chapters/:id` | JWT | Video, ringkasan, peristiwa & tokoh terkait, `wikiSummary` (403 jika era terkunci) |
+| GET | `/items/:id` | JWT | Detail peristiwa/tokoh + `wikiSummary` |
 | POST | `/chapters/:id/watched` | JWT | Tandai video sudah ditonton |
 | GET | `/chapters/:id/quiz` | JWT | Soal **tanpa** kunci jawaban |
 | POST | `/chapters/:id/quiz/submit` | JWT | → `{ score, passed, results[], eraUnlocked, badgeEarned, ... }` |
 | GET | `/me/progress` | JWT | Ringkasan progres, lencana, status semua era & bab |
+
+### Tes awal & tes lompat (aplikasi)
+
+| Method | Path | Auth | Keterangan |
+|---|---|---|---|
+| GET | `/me/placement` | JWT | Sudah tes awal atau belum + hasil terakhir |
+| GET | `/placement` | JWT | Soal tes awal (±2 per era, tanpa kunci). 409 `PLACEMENT_ALREADY_TAKEN` bila sudah pernah, kecuali `?retake=true` |
+| POST | `/placement/submit` | JWT | Nilai per era; era ≥ 80 dikuasai & dilewati → `{ eras[], masteredEras[], startEra, ... }` |
+| GET | `/eras/:id/test-out` | JWT | Kuis gabungan satu era (boleh untuk era terkunci) |
+| POST | `/eras/:id/test-out` | JWT | Skor ≥ 80 → era terbuka & bab dilewati → `{ score, passed, unlockedEras[], results[] }` |
 
 ### Admin (JWT role `admin`)
 
@@ -93,7 +108,10 @@ Base URL: `https://thehistoryofid.stei.site/api`
 | PUT / DELETE | `/admin/eras/:id` | Ubah / hapus era |
 | POST | `/admin/chapters` | Buat bab |
 | PUT / DELETE | `/admin/chapters/:id` | Ubah (mis. ganti `videoUrl`) / hapus bab |
-| GET / POST | `/admin/chapters/:id/questions` | Daftar soal (dengan kunci) / tambah soal |
+| GET / POST | `/admin/chapters/:id/questions` | Daftar soal semua status (dengan kunci) / tambah soal |
+| POST | `/admin/chapters/:id/generate-quiz` | **AI:** buat soal dengan Gemini, disimpan sebagai **draf** (lihat bagian 3b) |
+| POST | `/admin/questions/:id/approve` | Setujui soal draf agar dipakai di kuis |
+| POST | `/admin/chapters/:id/wiki-draft` | Draf ringkasan bab dari Wikipedia (tidak disimpan otomatis) |
 | PUT / DELETE | `/admin/questions/:id` | Ubah / hapus soal |
 | GET / POST | `/admin/api-keys` | Daftar / terbitkan API key kelompok lain |
 | DELETE | `/admin/api-keys/:id` | Cabut API key |
@@ -118,13 +136,30 @@ Semua error memakai format yang sama:
 
 | Status | Kode yang mungkin |
 |---|---|
-| 400 | `VALIDATION_ERROR` (disertai `details[]`), `INVALID_JSON`, `QUIZ_EMPTY` |
+| 400 | `VALIDATION_ERROR` (disertai `details[]`), `INVALID_JSON`, `QUIZ_EMPTY`, `TEST_NOT_STARTED`, `WIKI_TITLE_REQUIRED` |
 | 401 | `UNAUTHORIZED`, `INVALID_TOKEN`, `INVALID_CREDENTIALS`, `API_KEY_REQUIRED`, `INVALID_API_KEY` |
 | 403 | `FORBIDDEN`, `ERA_LOCKED`, `API_KEY_REVOKED` |
 | 404 | `NOT_FOUND` |
-| 409 | `CONFLICT` |
-| 429 | `RATE_LIMITED` (dari Nginx) |
-| 500 / 503 | `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE` |
+| 409 | `CONFLICT`, `PLACEMENT_ALREADY_TAKEN`, `ERA_ALREADY_DONE`, `TEST_EXPIRED` |
+| 429 | `RATE_LIMITED` (dari Nginx), `AI_QUOTA_EXCEEDED` (kuota Gemini habis) |
+| 502 / 504 | `AI_UNREACHABLE`, `AI_AUTH_FAILED`, `AI_UPSTREAM_ERROR`, `AI_INVALID_RESPONSE`, `AI_EMPTY_RESPONSE`, `WIKI_UNAVAILABLE`, `AI_TIMEOUT` |
+| 500 / 503 | `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE`, `AI_NOT_CONFIGURED` |
+
+### 3b. Integrasi eksternal
+
+**Generator kuis dengan Gemini (hanya admin).** Aturan dosen: model AI **tidak berjalan di STB**; backend hanya **memanggil API Gemini** lewat internet, dengan kunci di `.env` (`GEMINI_API_KEY`, tidak pernah di-commit; dikirim lewat header, bukan URL).
+
+1. `POST /api/admin/chapters/:id/generate-quiz` dengan body `{ "count": 5 }` (1–10). Backend mengirim judul + ringkasan bab ke Gemini dan meminta JSON terstruktur (`responseSchema`).
+2. Keluaran **divalidasi** lagi di server: tepat 4 opsi, opsi tidak kembar, `answerIndex` 0–3, pembahasan ada, bukan duplikat soal yang sudah ada. Soal yang gagal dibuang dan dilaporkan di `rejected[]`. Urutan opsi diacak di server supaya kunci tidak condong ke satu posisi.
+3. Soal disimpan sebagai **draf**: kolom `source = 'ai'`, `status = 'draft'`. Draf **tidak muncul** di kuis, tes awal, tes lompat, maupun API publik sampai admin memanggil `POST /api/admin/questions/:id/approve` (supaya tidak ada soal sejarah yang salah).
+4. Soal tersimpan dipakai ulang dari database. **Gemini tidak dipanggil** ketika pengguna membuka atau mengerjakan kuis (hemat kuota, cepat).
+5. Kegagalan memberi error jelas dan **tidak mengganggu fitur lain**: `AI_NOT_CONFIGURED` 503, `AI_QUOTA_EXCEEDED` 429, `AI_TIMEOUT` 504, `AI_INVALID_RESPONSE` / `AI_UNREACHABLE` / `AI_AUTH_FAILED` 502.
+
+Variabel `.env`: `GEMINI_API_KEY` (wajib untuk fitur ini), `GEMINI_MODEL` (default `gemini-2.5-flash`), `GEMINI_TIMEOUT_MS` (default 25000).
+
+**Materi dari Wikipedia.** Modul `src/integrations/wikipedia.js` memanggil `https://id.wikipedia.org/api/rest_v1/page/summary/<judul>` dengan header `User-Agent` yang jelas (`WIKI_USER_AGENT`). Bab dan tokoh/peristiwa punya kolom `wiki_title`; `GET /api/chapters/:id` dan `GET /api/items/:id` menambahkan `wikiSummary` (`extract`, `url`, atribusi CC BY-SA 4.0). Hasil di-**cache di database** (tabel `wiki_cache`) selama 7 hari (`WIKI_CACHE_DAYS`); artikel yang tidak ditemukan di-cache 1 hari. Jika Wikipedia gagal, materi tetap dikembalikan dengan `wikiSummary: null` (atau cache lama bila ada), tidak error.
+
+**Database lama (STB).** Kolom baru ditambahkan otomatis saat service start (migrasi ringan di `src/db/index.js`) dan `wiki_title` diisi untuk data yang sudah ada, sehingga **tidak perlu** `seed:reset` (yang akan menghapus progres).
 
 ## 4. Autentikasi
 
@@ -134,7 +169,7 @@ Semua error memakai format yang sama:
 Authorization: Bearer <token>
 ```
 
-Password disimpan sebagai hash bcrypt. Role `student` didapat dari registrasi; role `admin` hanya dari seed.
+Password disimpan sebagai hash bcrypt. Role `student` (ditampilkan sebagai "Pengguna" di aplikasi) didapat dari registrasi; role `admin` hanya dari seed.
 
 **Kelompok lain (API key).** Kirim header:
 
@@ -160,7 +195,7 @@ API=https://thehistoryofid.stei.site/api
 # Login
 curl -s -X POST $API/auth/login -H "Content-Type: application/json" \
   -d '{"email":"siswa@thehistoryofid.test","password":"<password>"}'
-# -> {"user":{"id":2,"email":"siswa@thehistoryofid.test","name":"Siswa Uji","role":"student",...},"token":"eyJhbGciOi..."}
+# -> {"user":{"id":2,"email":"siswa@thehistoryofid.test","name":"Pengguna Uji","role":"student",...},"token":"eyJhbGciOi..."}
 
 TOKEN=eyJhbGciOi...
 
@@ -202,7 +237,7 @@ Daftar lengkap request dan response ada di Swagger UI (`/api/docs`).
 | Role | Email | Password |
 |---|---|---|
 | admin | `admin@thehistoryofid.test` | nilai `SEED_ADMIN_PASSWORD` di `.env` |
-| student | `siswa@thehistoryofid.test` | nilai `SEED_STUDENT_PASSWORD` di `.env` |
+| student (pengguna umum) | `siswa@thehistoryofid.test` | nilai `SEED_STUDENT_PASSWORD` di `.env` |
 
 Password tidak ditulis di repo; minta ke kelompok kami bila diperlukan untuk penilaian. Semua data adalah data uji, bukan data pribadi asli. Video hanya berupa tautan YouTube.
 
@@ -228,7 +263,7 @@ cd core-service
 npm install
 npm run seed                  # isi database (otomatis juga saat start jika kosong)
 npm run dev                   # http://localhost:3000/api/health  dan  /api/docs
-npm test                      # 29 test Jest + supertest
+npm test                      # 57 test Jest + supertest (tidak butuh internet; Gemini & Wikipedia dipalsukan)
 ```
 
 Perintah lain: `npm run seed:reset` (isi ulang konten & hapus progres), `node src/db/backup.js` (backup database).
